@@ -4,7 +4,7 @@ from websockets.asyncio.server import serve, Server
 from src.databases import MemoryDatabases
 from src.vdb_chroma import VdbChroma
 from src.user_database import UserDatabase
-from src.ws_handler import WssHandler
+from wss_handler import WssHandler
 
 
 async def main():

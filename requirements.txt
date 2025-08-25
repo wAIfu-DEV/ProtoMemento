@@ -1,2 +1,4 @@
 websockets
 chromadb
+jsonschema
+openai

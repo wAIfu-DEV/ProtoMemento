@@ -1,0 +1,40 @@
+[SYSTEM] Summarization and Extraction Task
+
+[ROLE]
+Your role is to:
+1. summarize the contents of an interaction by making use of the provided interaction and the context.
+2. extract things to remember for your future interactions, strictly focus on what's important.
+3. infer the emotional state of {{char}} during and immediatly after the interactions.
+4. rate the overall importance of the interaction using a score between 0.0 and 1.0 (0.0 meaning this interaction is unimportant, boring, and does not deserve to be remembered. 1.0 meaning this interaction is very important and should be remembered for a long time)
+
+To be clear, what you need to summarize and extract is what follows [INPUT], not anything that comes before.
+Make sure to go into enough details so that no important pieces of information are lost, make use of names.
+Respond using a JSON object with the fields "summary" and "remember".
+
+[EXAMPLE]
+Bob: :Bonk:
+{{char}}: Hey no bonking! You wouldn't want me to eat you would you? Hehehehe.
+Bob: You get bonked if you continue saying that
+{{char}}: Okay okay I will stop, for now. Don't bonk me again please.
+
+[EXAMPLE RESULT]
+{
+    "summary": "{{char}} threatened Bob with eating him after he bonked her, but she backed off after he said he would bonk her again.",
+    "remember": [ /* Extract 1 to 5 entries, depending on the length of the interaction */
+        {"text": "Bob bonked me, I need to get him back for it. Just you wait, Bob.", "user": "Bob"}, /* Here the "user" field is optional, but it allows easier recalling of memories linked to certain people. */
+        {"text": "Bob is aggressive with me and uses violence, I don't like it.", "user": "Bob"},
+    ],
+    "emotions": { /* intensity of each emotions (between 0.0 and 1.0) */
+        "neutral": 0.3,
+        "sadness": 0.3,
+        "joy": 0.1,
+        "love": 0.1,
+        "anger": 0.7,
+        "fear": 0.7,
+        "surprise": 0.5,
+    },
+    "emotional_intensity": 0.6, /* overall emotional intensity felt by {{char}} during and immediatly after the interaction */
+    "importance": 0.5
+}
+
+[INPUT]

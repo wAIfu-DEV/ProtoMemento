@@ -1,0 +1,2 @@
+- configuration
+- eviction strategy for short term vdb

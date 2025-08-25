@@ -1,20 +1,17 @@
 import json
 import uuid
-from typing import Self
+from typing import Optional, Self
+from pydantic import BaseModel
 
 
-class Memory:
+class Memory(BaseModel):
     id: str
-    user: str | None
+    user: Optional[str]
     content: str
     time: int
 
-    def __init__(self, id: str = "", content: str = "", time: int = 0, user: str | None = None):
-        self.id = id
-        self.content = content
-        self.time = time
-        self.user = user
-        return
+    class Config:
+        populate_by_name = True
     
     @staticmethod
     def from_dict(input: dict)-> Self:
@@ -25,7 +22,6 @@ class Memory:
             user=input.get("user", None),
         )
 
-    
     def to_dict(self)-> dict:
         return {
             "id": str(self.id),
