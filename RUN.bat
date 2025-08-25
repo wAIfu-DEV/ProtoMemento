@@ -1,5 +1,6 @@
 @ECHO OFF
 
+REM Can be either py or python, depends on the system
 SET PY_PATH=py
 SET CWD=%~dp0
 
