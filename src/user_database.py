@@ -86,8 +86,7 @@ class UserDatabase:
 
         mems: list[dict] = obj.get("mems", None)
         if not mems:
-            # TODO better error
-            return
+            raise AssertionError('missing field "mems" in user file.')
         
         if len(mems) > self.size_limit_per_user:
             mems = mems[len(mems) - self.size_limit_per_user:] # rem first elems
@@ -110,8 +109,7 @@ class UserDatabase:
 
         mems: list[dict] = obj.get("mems", None)
         if not mems:
-            # TODO better error
-            return []
+            raise AssertionError('missing field "mems" in user file.')
         
         if len(mems) <= n:
             return [Memory.from_dict(x) for x in mems]
