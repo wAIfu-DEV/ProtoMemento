@@ -33,7 +33,11 @@ class EvictingVdb(VectorDataBase):
         self.wrapped.remove(coll_name)
         return
     
-    
+
+    def count(self, coll_name: str)-> int:
+        return self.wrapped.count(coll_name)
+
+
     def evict_all()-> None:
         return
         

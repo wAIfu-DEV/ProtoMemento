@@ -15,4 +15,7 @@ class VectorDataBase:
     
     def clear(self, coll_name: str)-> None:
         return
+    
+    def count(self, coll_name: str)-> int:
+        return 0
         

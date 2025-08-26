@@ -93,3 +93,7 @@ class VdbChroma(VectorDataBase):
         self.client.delete_collection(coll_name)
         self.coll_cache[coll_name] = self.client.create_collection(coll_name)
         return
+    
+
+    def count(self, coll_name: str)-> int:
+        return self._get_collection(coll_name).count()

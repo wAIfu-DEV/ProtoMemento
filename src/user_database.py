@@ -114,5 +114,5 @@ class UserDatabase:
         if len(mems) <= n:
             return [Memory.from_dict(x) for x in mems]
         
-        unparsed_res = mems[len(mems) - n:]
-        return [Memory.from_dict(x) for x in unparsed_res]
+        mems = mems[len(mems) - n:]
+        return [Memory.from_dict(x) for x in mems]
