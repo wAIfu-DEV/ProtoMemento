@@ -2,7 +2,7 @@ from src.evicting_vdb import EvictingVdb
 from src.user_database import UserDatabase
 from src.vector_database import VectorDataBase
 
-class MemoryDatabases:
+class DbBundle:
     short_term: EvictingVdb
     long_term: VectorDataBase
     users: UserDatabase

@@ -8,7 +8,7 @@ from pathlib import Path
 from src.memory import Memory
 from src.ai import AI
 from src.messages import MsgQuery, MsgStore, MsgProcess
-from src.databases import MemoryDatabases
+from db_bundle import DbBundle
 from websockets.asyncio.server import Server, ServerConnection
 from websockets import ConnectionClosed
 
@@ -17,14 +17,14 @@ MessageTypes = Literal["query", "store", "process", "unhandled"]
 
 
 class WssHandler:
-    dbs: MemoryDatabases
+    dbs: DbBundle
     server: Server = None
     ai: AI
 
     handlers: dict[MessageTypes, Callable[[ServerConnection, dict], Coroutine]] = {}
 
 
-    def __init__(self, database_bundle: MemoryDatabases, config)-> None:
+    def __init__(self, database_bundle: DbBundle, config)-> None:
         self.dbs = database_bundle
         self.handlers = {
             "query": self._on_query,
