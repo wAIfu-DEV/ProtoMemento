@@ -1,8 +1,11 @@
 import json
+import time
 import traceback
+import uuid
 from typing import Callable, Coroutine, Literal
 from pathlib import Path
 
+from src.memory import Memory
 from src.ai import AI
 from src.messages import MsgQuery, MsgStore, MsgProcess
 from src.databases import MemoryDatabases
@@ -168,8 +171,28 @@ class WssHandler:
             context=message.context if not message.context is None else [],
             messages=message.messages,
         )
-        importance_score = (res.emotional_intensity + res.importance_score) / 2.0
-        
+        score = (res.emotional_intensity + res.importance) / 2.0
+        mem_time = int(time.time() * 1000.0)
+
+        # TODO: implement score system
+        self.dbs.short_term.store(message.ai_name, Memory(
+            id=uuid.uuid4(),
+            content=res.summary,
+            user=None,
+            time=mem_time,
+        ))
+
+        for rem in res.remember:
+            mem = Memory(
+                id=uuid.uuid4(),
+                content=rem.text,
+                user=rem.user,
+                time=mem_time,
+            )
+            self.dbs.short_term.store(message.ai_name, mem)
+            if not rem.user is None:
+                self.dbs.users.store(message.ai_name, rem.user, mem)
+         
         return
 
 

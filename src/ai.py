@@ -1,9 +1,10 @@
 import re
 import openai
+
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from memory import Memory
-from messages import OpenLlmMsg
+from src.memory import Memory
+from src.messages import OpenLlmMsg
 
 
 class RememberEntry(BaseModel):
@@ -40,31 +41,33 @@ class AI:
         )
         self.model_name = model_name
         return
+    
 
-
-    async def process(self, ai_name: str, context: list[OpenLlmMsg], messages: list[OpenLlmMsg])-> ProcessResult | None:
-        process_prompt = ""
+    def _get_cached_prompt(self, prompt_name: str)-> str:
         if "process" in self.prompt_cache:
-            process_prompt = self.prompt_cache["process"]
+            return self.prompt_cache["process"]
         else:
             with open("./prompts/process.txt", "r", encoding="utf-8") as f:
                 self.prompt_cache["process"] = f.read()
-            process_prompt = self.prompt_cache["process"]
+            return self.prompt_cache["process"]
+
+
+    async def process(self, ai_name: str, context: list[OpenLlmMsg], messages: list[OpenLlmMsg])-> ProcessResult | None:
+        process_prompt = self._get_cached_prompt("process")
 
         msg_str = ""
         for msg in messages:
             name = ""
             match msg.role:
-                case "assistant":
-                    name = ai_name
-                case "user":
-                    name = msg.name if not msg.name is None else "User"
-                case "system":
-                    name = "SYSTEM"
+                case "assistant": name = ai_name
+                case "user":      name = msg.name if not msg.name is None else "User"
+                case "system":    name = "SYSTEM"
+                case _:           continue # skip any messages that aren't standard
             msg_str += f"{name}: {msg.content}\n"
         
         process_prompt = re.sub(r"\{\{char\}\}", ai_name, process_prompt)
-
+        process_prompt = process_prompt if process_prompt.endswith("\n") else process_prompt + "\n"
+        
         prompt_msg = {
             "role": "user",
             "content": f"{ process_prompt }{ msg_str.strip() }",
