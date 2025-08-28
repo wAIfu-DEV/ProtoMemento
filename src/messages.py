@@ -8,6 +8,7 @@ from src.memory import Memory
 DataBases = Literal["stm", "ltm", "users"]
 MessageTypes = Literal["query", "store", "process", "evict", "unhandled"]
 
+
 class MsgQuery(BaseModel):
     type: Literal["query"] = Field(...)
     uid: str = Field(...)

@@ -2,6 +2,7 @@ import json
 import time
 import traceback
 import uuid
+import logging
 from typing import Callable, Coroutine, Literal
 from pathlib import Path
 
@@ -27,9 +28,12 @@ class WssHandler:
     ai: AI
 
     handlers: dict[MessageTypes, Callable[[ServerConnection, dict], Coroutine]] = {}
+    logger: logging.Logger
 
 
     def __init__(self, database_bundle: DbBundle, config: Config, env: dict)-> None:
+        self.logger = logging.getLogger(self.__class__.__name__)
+        
         self.config = config
         self.env = env
         
@@ -49,17 +53,26 @@ class WssHandler:
             api_key=env["OPENAI_API_KEY"],
             config=config
         )
+        self.logger.info("initialized wss handler")
         return
 
 
+    async def _send(self, conn: ServerConnection, data: dict)-> None:
+        await conn.send(json.dumps(data), text=True)
+
+
     async def _send_error(self, conn: ServerConnection, e: Exception, id: str | None = None)-> None:
+        err = str(e)
+        tb = traceback.format_exc()
+        self.logger.error("wss handler error: %s\n%s", err, tb)
+
         obj = {
             "type": "error",
-            "error": str(e) + "\n" + traceback.format_exc(),
+            "error": f"{err}\n{tb}",
         }
         if not id is None:
             obj["uid"] = id
-        await conn.send(json.dumps(obj), text=True)
+        await self._send(conn, obj)
 
 
     async def handle(self, conn: ServerConnection)-> None:
@@ -73,6 +86,8 @@ class WssHandler:
                 # the app close by itself, which is massive.
                 # Would prevent addr already used errs
                 return
+
+            self.logger.info("received message: %s", data)
         
             try:
                 obj: dict = json.loads(data)
@@ -150,8 +165,7 @@ class WssHandler:
             )
             response["users"] = [x.to_dict() for x in user_query]
         
-        resp_str = json.dumps(response)
-        await conn.send(resp_str, text=True)
+        await self._send(conn, response)
         return
 
 
@@ -180,6 +194,14 @@ class WssHandler:
             context=message.context if not message.context is None else [],
             messages=message.messages,
         )
+
+        await self._send(conn, {
+            "uid": message.uid,
+            "type": "summary",
+            "summary": res.summary,
+        })
+
+        # TODO: use score to determine lifetime
         score = (res.emotional_intensity + res.importance) / 2.0
         mem_time = int(time.time() * 1000.0)
 

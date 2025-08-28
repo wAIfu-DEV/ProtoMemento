@@ -1,3 +1,4 @@
+import logging
 import os
 from chromadb import Client, ClientAPI, Collection, Settings
 
@@ -8,17 +9,20 @@ class VdbChroma(VectorDataBase):
     client: ClientAPI = None
     coll_cache: dict[str, Collection] = {}
     size_limit: int = -1
+    logger: logging.Logger
 
 
     def __init__(self, db_name: str, size_limit: int = -1)-> None:
+        self.logger = logging.getLogger(f"{self.__class__.__name__}({db_name})")
         self.size_limit = size_limit
         settings = Settings()
         settings.is_persistent = True
+        settings.anonymized_telemetry = False
         path = os.path.join(".", "vectors", db_name)
         os.makedirs(path, exist_ok=True)
         settings.persist_directory = path
         self.client = Client(settings=settings)
-        super().__init__()
+        self.logger.info("initialized %s vector database", db_name)
         return
 
 
@@ -49,10 +53,20 @@ class VdbChroma(VectorDataBase):
 
 
     def store(self, coll_name: str, memory: Memory)-> None:
+        metadata = {
+            "t": memory.time,
+            "u": memory.user,
+        }
+
+        if not memory.score is None:
+            metadata["s"] = memory.score
+        if not memory.lifetime is None:
+            metadata["l"] = memory.lifetime
+
         self._get_collection(coll_name).add(
+            ids=[memory.id],
             documents=[memory.content],
-            metadatas=[{"timestamp": memory.time, "score": 0.0, "user": memory.user}], # TODO implement score and decay sys
-            ids=[memory.id]
+            metadatas=[metadata],
         )
 
         if self.size_limit >= 0:
@@ -68,22 +82,25 @@ class VdbChroma(VectorDataBase):
     def query(self, coll_name: str, query_str: str, n: int)-> list[QueriedMemory]:
         final: list[QueriedMemory] = []
 
-        query_res = self._get_collection(coll_name).query(
+        res = self._get_collection(coll_name).query(
             query_texts=[query_str],
             n_results=n,
         )
 
-        results_len = len(query_res["documents"][0])
-        for i in range(results_len):
+        res_len = len(res["documents"][0])
+        for i in range(res_len):
+            meta = res["metadatas"][0][i]
             mem: Memory = Memory(
-                id=query_res["ids"][0][i],
-                content=query_res["documents"][0][i],
-                time=query_res["metadatas"][0][i]["timestamp"],
-                user=query_res["metadatas"][0][i]["user"],
+                id=      res["ids"][0][i],
+                content= res["documents"][0][i],
+                time=    meta.get("t", 0),
+                user=    meta.get("u", None),
+                score=   meta.get("s", None),
+                lifetime=meta.get("l", None),
             )
             qmem: QueriedMemory = QueriedMemory(
                 memory=mem,
-                distance=query_res["distances"][0][i],
+                distance=res["distances"][0][i],
             )
             final.append(qmem)
 
@@ -93,11 +110,14 @@ class VdbChroma(VectorDataBase):
     def pop_oldest(self, coll_name: str)-> Memory:
         coll = self._get_collection(coll_name)
         res = coll.get(ids=None, offset=0, limit=1)
+        meta = res["metadatas"][0]
         mem: Memory = Memory(
-            id=res["ids"][0],
-            content=res["documents"][0],
-            time=res["metadatas"][0]["timestamp"],
-            user=res["metadatas"][0]["user"],
+            id=      res["ids"][0],
+            content= res["documents"][0],
+            time=    meta.get("t", 0),
+            user=    meta.get("u", None),
+            score=   meta.get("s", None),
+            lifetime=meta.get("l", None),
         )
         coll.delete(ids=[mem.id])
         return mem

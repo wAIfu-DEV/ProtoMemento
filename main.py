@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from websockets.asyncio.server import serve
 
 #from src.messages import generate_schemas
@@ -13,11 +14,19 @@ from src.wss_handler import WssHandler
 
 
 async def main():
+    logging.basicConfig(
+        format='[%(asctime)s][%(filename)s:%(lineno)s][%(name)s.%(funcName)s] %(message)s',
+        level=logging.INFO
+    )
+    logger = logging.getLogger("global")
+
+    logger.info("reading config & env")
     env = parse_env()
     conf = parse_config()
 
     #generate_schemas() # Generate schemas for inbound Ws messages
 
+    logger.info("initializing databases...")
     short_size = conf.short_vdb.max_size_before_evict + 10\
                       if conf.short_vdb.max_size_before_evict > 0\
                       else -1
@@ -31,11 +40,12 @@ async def main():
         max_size_before_evict=conf.short_vdb.max_size_before_evict,
     )
     long_decaying = DecayingVdb(wrapped_vdb=long_vdb)
+
     user_db = UserDatabase(size_limit_per_user=conf.user_db.max_size_per_user)
 
     bundle = DbBundle(short=short_evicting, long=long_decaying, users=user_db)
-    wss_handler = WssHandler(database_bundle=bundle, config=conf, env=env)
 
+    wss_handler = WssHandler(database_bundle=bundle, config=conf, env=env)
     async with serve(wss_handler.handle, host=conf.wss.host, port=conf.wss.port) as wss:
         wss_handler.server = wss
         await asyncio.Future()

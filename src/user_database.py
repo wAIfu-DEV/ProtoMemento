@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 
 from src.memory import Memory
@@ -11,11 +12,14 @@ import src.utils as utils
 
 class UserDatabase:
     size_limit_per_user: int = -1
+    logger: logging.Logger
 
     def __init__(self, size_limit_per_user=-1):
+        self.logger = logging.getLogger(f"{self.__class__.__name__}")
         if not self._is_initialized():
             self._initialize()
         self.size_limit_per_user = size_limit_per_user
+        self.logger.info("initialized user KV database")
         return
 
 

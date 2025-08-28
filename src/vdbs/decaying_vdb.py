@@ -1,12 +1,15 @@
+import logging
 from src.memory import Memory, QueriedMemory
 from src.vdbs.vector_database import VectorDataBase
 
 # TODO: implement decay
 class DecayingVdb(VectorDataBase):
     wrapped: VectorDataBase
+    logger: logging.Logger
 
 
     def __init__(self, wrapped_vdb: VectorDataBase)-> None:
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.wrapped = wrapped_vdb
         return
 
@@ -32,8 +35,15 @@ class DecayingVdb(VectorDataBase):
 
     def count(self, coll_name: str)-> int:
         return self.wrapped.count(coll_name)
-    
+
 
     def pop_oldest(self, coll_name: str)-> Memory:
         return self.wrapped.pop_oldest(coll_name)
+
+
+    def decay_all(self, coll_name: str)-> None:
+        self.logger.info("starting decay routine...")
+        # TODO: implement decay using "l" metadata field representing lifetime
+        self.logger.info("finished decaying all memories")
+        return
         

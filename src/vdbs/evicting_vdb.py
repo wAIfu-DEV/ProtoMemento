@@ -1,14 +1,16 @@
+import logging
 from src.memory import Memory, QueriedMemory
 from src.vdbs.vector_database import VectorDataBase
 
-# TODO: implement eviction
 class EvictingVdb(VectorDataBase):
     wrapped: VectorDataBase
     dest: VectorDataBase
     max_size: int
+    logger: logging.Logger
 
 
     def __init__(self, wrapped_vdb: VectorDataBase, dest_vdb: VectorDataBase, max_size_before_evict = -1)-> None:
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.wrapped = wrapped_vdb
         self.dest = dest_vdb
         self.max_size = max_size_before_evict
