@@ -3,6 +3,8 @@ import openai
 
 from pydantic import BaseModel, Field
 from typing import List, Optional
+
+from src.config import Config
 from src.memory import Memory
 from src.messages import OpenLlmMsg
 
@@ -29,12 +31,14 @@ class ProcessResult(BaseModel):
 
 
 class AI:
+    config: Config
     client: openai.Client
     model_name: str
     prompt_cache: dict[str, str] = {}
 
 
-    def __init__(self, base_url: str | None = None, api_key: str | None = None, model_name: str = ""):
+    def __init__(self, base_url: str | None = None, api_key: str | None = None, model_name: str = "", config: Config = None):
+        self.config = config
         self.client = openai.Client(
             api_key=api_key,
             base_url=base_url,
@@ -44,12 +48,12 @@ class AI:
     
 
     def _get_cached_prompt(self, prompt_name: str)-> str:
-        if "process" in self.prompt_cache:
-            return self.prompt_cache["process"]
+        if prompt_name in self.prompt_cache:
+            return self.prompt_cache[prompt_name]
         else:
-            with open("./prompts/process.txt", "r", encoding="utf-8") as f:
-                self.prompt_cache["process"] = f.read()
-            return self.prompt_cache["process"]
+            with open(f"./prompts/{prompt_name}.txt", "r", encoding="utf-8") as f:
+                self.prompt_cache[prompt_name] = f.read()
+            return self.prompt_cache[prompt_name]
 
 
     async def process(self, ai_name: str, context: list[OpenLlmMsg], messages: list[OpenLlmMsg])-> ProcessResult | None:
@@ -73,11 +77,12 @@ class AI:
             "content": f"{ process_prompt }{ msg_str.strip() }",
         }
 
+        # TODO: use config
         completion = self.client.beta.chat.completions.parse(
             model=self.model_name,
             messages=[*context, prompt_msg],
-            temperature=0.75,
-            max_completion_tokens=1_000,
+            temperature=self.config.openllm.temp,
+            max_completion_tokens=self.config.openllm.max_completion_tokens,
             response_format=ProcessResult,
         )
         return completion.choices[0].message.parsed

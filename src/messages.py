@@ -1,5 +1,6 @@
 from typing import Literal, List, Optional
 from pydantic import BaseModel, Field
+
 from src.memory import Memory
 
 DataBases = Literal["stm", "ltm", "users"]

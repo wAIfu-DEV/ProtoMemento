@@ -88,7 +88,7 @@ class UserDatabase:
         if not mems:
             raise AssertionError('missing field "mems" in user file.')
         
-        if len(mems) > self.size_limit_per_user:
+        if self.size_limit_per_user >= 0 and len(mems) > self.size_limit_per_user:
             mems = mems[len(mems) - self.size_limit_per_user:] # rem first elems
         
         mems.append(memory.to_dict())

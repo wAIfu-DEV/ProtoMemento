@@ -54,7 +54,7 @@ class VdbChroma(VectorDataBase):
             ids=[memory.id]
         )
 
-        if self.size_limit >= -1:
+        if self.size_limit >= 0:
             self._restrict_size()
         return
 
@@ -87,6 +87,19 @@ class VdbChroma(VectorDataBase):
             final.append(qmem)
 
         return final
+
+
+    def pop_oldest(self, coll_name: str)-> Memory:
+        coll = self._get_collection(coll_name)
+        res = coll.get(ids=None, offset=0, limit=1)
+        mem: Memory = Memory(
+            id=res["ids"][0],
+            content=res["documents"][0],
+            time=res["metadatas"][0]["timestamp"],
+            user=res["metadatas"][0]["user"],
+        )
+        coll.delete(ids=[mem.id])
+        return mem
 
 
     def clear(self, coll_name: str)-> None:

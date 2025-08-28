@@ -5,18 +5,23 @@ import uuid
 from typing import Callable, Coroutine, Literal
 from pathlib import Path
 
+from websockets.asyncio.server import Server, ServerConnection
+from websockets import ConnectionClosed
+
+from src.config import Config
 from src.memory import Memory
 from src.ai import AI
 from src.messages import MsgQuery, MsgStore, MsgProcess
-from db_bundle import DbBundle
-from websockets.asyncio.server import Server, ServerConnection
-from websockets import ConnectionClosed
+from src.db_bundle import DbBundle
 
 
 MessageTypes = Literal["query", "store", "process", "unhandled"]
 
 
 class WssHandler:
+    config: Config
+    env: dict
+
     dbs: DbBundle
     server: Server = None
     ai: AI
@@ -24,7 +29,10 @@ class WssHandler:
     handlers: dict[MessageTypes, Callable[[ServerConnection, dict], Coroutine]] = {}
 
 
-    def __init__(self, database_bundle: DbBundle, config)-> None:
+    def __init__(self, database_bundle: DbBundle, config: Config, env: dict)-> None:
+        self.config = config
+        self.env = env
+        
         self.dbs = database_bundle
         self.handlers = {
             "query": self._on_query,
@@ -36,9 +44,10 @@ class WssHandler:
 
         # TODO: fill with config
         self.ai = AI(
-            base_url=config.openai_base_url,
-            api_key=config.openai_api_key,
-            model_name=config.openai_model_name,
+            base_url=config.openllm.base_url,
+            model_name=config.openllm.model,
+            api_key=env["OPENAI_API_KEY"],
+            config=config
         )
         return
 
