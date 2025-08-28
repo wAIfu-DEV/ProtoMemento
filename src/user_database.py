@@ -10,6 +10,8 @@ import src.utils as utils
 # since storing to it would just be a matter of appending to file,
 # no need for the read -> parse -> modify -> stringify -> write bullshit
 
+# TODO: caching for active users
+
 class UserDatabase:
     size_limit_per_user: int = -1
     logger: logging.Logger

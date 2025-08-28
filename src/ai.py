@@ -24,7 +24,7 @@ class EmotionState(BaseModel):
 class ProcessResult(BaseModel):
     summary: str = Field(..., max_length=150)
     remember: List[RememberEntry] = Field(..., min_length=1, max_length=10)
-    emotions: EmotionState = Field(...),
+    emotions: EmotionState = Field(...)
     emotional_intensity: float = Field(..., ge=0.0, le=1.0, multiple_of=0.1)
     importance: float = Field(..., ge=0.0, le=1.0, multiple_of=0.1)
 
