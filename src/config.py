@@ -1,4 +1,5 @@
 import re
+from jsonc_parser.parser import JsoncParser
 from pydantic import BaseModel, Field
 
 
@@ -36,11 +37,5 @@ class Config(BaseModel):
 
 
 def parse_config()-> Config:
-    with open("./config.jsonc", "r", encoding="utf-8") as f:
-        json_data = f.read()
-
-    # strip comments, yup this is it, this is the jsonc parser
-    json_data = re.sub(r"//.*\n", "", json_data)
-    json_data = re.sub(r"/\*[^]*\*\/", "", json_data)
-
-    return Config.model_validate_json(json_data)
+    obj = JsoncParser.parse_file("./config.jsonc")
+    return Config.model_validate(obj)

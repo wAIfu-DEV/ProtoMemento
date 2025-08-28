@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 
 from src.config import Config
-from src.memory import Memory
 from src.messages import OpenLlmMsg
 
 
