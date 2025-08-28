@@ -34,6 +34,7 @@ async def main():
     short_vdb = VdbChroma(db_name="short", size_limit=short_size)
     long_vdb = VdbChroma(db_name="long", size_limit=conf.long_vdb.max_size)
 
+    # implement progressive_eviction from config
     short_evicting = EvictingVdb(
         wrapped_vdb=short_vdb,
         dest_vdb=long_vdb,
