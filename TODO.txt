@@ -1,4 +1,2 @@
-- configuration
-- eviction strategy for short term vdb
 - implement score/lifetime with vector db
 - implement decay system

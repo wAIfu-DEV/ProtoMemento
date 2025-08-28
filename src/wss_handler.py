@@ -11,11 +11,11 @@ from websockets import ConnectionClosed
 from src.config import Config
 from src.memory import Memory
 from src.ai import AI
-from src.messages import MsgQuery, MsgStore, MsgProcess
+from src.messages import MessageTypes, MsgEvict, MsgQuery, MsgStore, MsgProcess
 from src.db_bundle import DbBundle
 
 
-MessageTypes = Literal["query", "store", "process", "unhandled"]
+
 
 
 class WssHandler:
@@ -38,11 +38,11 @@ class WssHandler:
             "query": self._on_query,
             "store": self._on_store,
             "process": self._on_process,
+            "evict": self._on_evict,
 
             "unhandled": self._on_unhandled,
         }
 
-        # TODO: fill with config
         self.ai = AI(
             base_url=config.openllm.base_url,
             model_name=config.openllm.model,
@@ -134,7 +134,7 @@ class WssHandler:
 
             long_query = self.dbs.long_term.query(
                 coll_name=message.ai_name,
-                query_str=message.query + f" ({message.user})",
+                query_str=f"{message.query} ( {message.user} )",
                 n=n,
             )
             response["ltm"] = [x.to_dict() for x in long_query]
@@ -205,6 +205,11 @@ class WssHandler:
         return
 
 
-    async def _on_unhandled(self, conn: ServerConnection, _: dict)-> None:
-        # TODO: send to error pipe
+    async def _on_evict(self, conn: ServerConnection, obj: dict)-> None:
+        message = MsgEvict.model_validate(obj)
+        self.dbs.short_term.evict_all(message.ai_name)
         return
+
+
+    async def _on_unhandled(self, conn: ServerConnection, obj: dict)-> None:
+        raise TypeError("Received message with unhandled message type: " + json.dumps(obj))

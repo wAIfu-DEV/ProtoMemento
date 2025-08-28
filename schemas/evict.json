@@ -1,0 +1,24 @@
+{
+    "properties": {
+        "type": {
+            "const": "evict",
+            "title": "Type",
+            "type": "string"
+        },
+        "uid": {
+            "title": "Uid",
+            "type": "string"
+        },
+        "ai_name": {
+            "title": "Ai Name",
+            "type": "string"
+        }
+    },
+    "required": [
+        "type",
+        "uid",
+        "ai_name"
+    ],
+    "title": "MsgEvict",
+    "type": "object"
+}

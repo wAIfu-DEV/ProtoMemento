@@ -1,10 +1,12 @@
+import json
+import os
 from typing import Literal, List, Optional
 from pydantic import BaseModel, Field
 
 from src.memory import Memory
 
 DataBases = Literal["stm", "ltm", "users"]
-
+MessageTypes = Literal["query", "store", "process", "evict", "unhandled"]
 
 class MsgQuery(BaseModel):
     type: Literal["query"] = Field(...)
@@ -48,3 +50,26 @@ class MsgProcess(BaseModel):
 
     class Config:
         populate_by_name = True
+
+
+class MsgEvict(BaseModel):
+    type: Literal["evict"] = Field(...)
+    uid: str = Field(...)
+    ai_name: str = Field(...)
+
+    class Config:
+        populate_by_name = True
+
+
+def generate_schemas()-> None:
+    models: list[tuple[MessageTypes, BaseModel]] = [
+        ("query", MsgQuery),
+        ("store", MsgStore),
+        ("process", MsgProcess),
+        ("evict", MsgEvict),
+    ]
+
+    for tpl in models:
+        schema = tpl[1].model_json_schema()
+        with open(os.path.join(".", "schemas", tpl[0] + ".json"), "w", encoding="utf-8") as f:
+            json.dump(schema, f, indent=4)

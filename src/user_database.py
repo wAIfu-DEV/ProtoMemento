@@ -9,8 +9,6 @@ import src.utils as utils
 # since storing to it would just be a matter of appending to file,
 # no need for the read -> parse -> modify -> stringify -> write bullshit
 
-# TODO: Add 'collections' so that multiple client AIs don't share memory
-
 class UserDatabase:
     size_limit_per_user: int = -1
 

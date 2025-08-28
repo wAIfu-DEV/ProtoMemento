@@ -76,7 +76,6 @@ class AI:
             "content": f"{ process_prompt }{ msg_str.strip() }",
         }
 
-        # TODO: use config
         completion = self.client.beta.chat.completions.parse(
             model=self.model_name,
             messages=[*context, prompt_msg],

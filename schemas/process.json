@@ -1,0 +1,91 @@
+{
+    "$defs": {
+        "OpenLlmMsg": {
+            "properties": {
+                "role": {
+                    "anyOf": [
+                        {
+                            "enum": [
+                                "assistant",
+                                "user",
+                                "system"
+                            ],
+                            "type": "string"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "title": "Role"
+                },
+                "content": {
+                    "title": "Content",
+                    "type": "string"
+                },
+                "name": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "title": "Name"
+                }
+            },
+            "required": [
+                "role",
+                "content",
+                "name"
+            ],
+            "title": "OpenLlmMsg",
+            "type": "object"
+        }
+    },
+    "properties": {
+        "type": {
+            "const": "process",
+            "title": "Type",
+            "type": "string"
+        },
+        "uid": {
+            "title": "Uid",
+            "type": "string"
+        },
+        "ai_name": {
+            "title": "Ai Name",
+            "type": "string"
+        },
+        "context": {
+            "anyOf": [
+                {
+                    "items": {
+                        "$ref": "#/$defs/OpenLlmMsg"
+                    },
+                    "type": "array"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "title": "Context"
+        },
+        "messages": {
+            "items": {
+                "$ref": "#/$defs/OpenLlmMsg"
+            },
+            "title": "Messages",
+            "type": "array"
+        }
+    },
+    "required": [
+        "type",
+        "uid",
+        "ai_name",
+        "context",
+        "messages"
+    ],
+    "title": "MsgProcess",
+    "type": "object"
+}

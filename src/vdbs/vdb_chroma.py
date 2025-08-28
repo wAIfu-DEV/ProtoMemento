@@ -1,7 +1,7 @@
 import os
 from chromadb import Client, ClientAPI, Collection, Settings
 
-from src.vector_database import VectorDataBase
+from src.vdbs.vector_database import VectorDataBase
 from src.memory import Memory, QueriedMemory
 
 class VdbChroma(VectorDataBase):

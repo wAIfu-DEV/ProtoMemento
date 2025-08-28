@@ -1,0 +1,59 @@
+{
+    "properties": {
+        "type": {
+            "const": "query",
+            "title": "Type",
+            "type": "string"
+        },
+        "uid": {
+            "title": "Uid",
+            "type": "string"
+        },
+        "ai_name": {
+            "title": "Ai Name",
+            "type": "string"
+        },
+        "user": {
+            "title": "User",
+            "type": "string"
+        },
+        "query": {
+            "title": "Query",
+            "type": "string"
+        },
+        "from": {
+            "items": {
+                "enum": [
+                    "stm",
+                    "ltm",
+                    "users"
+                ],
+                "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "From",
+            "type": "array"
+        },
+        "n": {
+            "items": {
+                "type": "integer"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "N",
+            "type": "array"
+        }
+    },
+    "required": [
+        "type",
+        "uid",
+        "ai_name",
+        "user",
+        "query",
+        "from",
+        "n"
+    ],
+    "title": "MsgQuery",
+    "type": "object"
+}

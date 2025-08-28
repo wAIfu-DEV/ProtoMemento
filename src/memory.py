@@ -23,12 +23,14 @@ class Memory(BaseModel):
         )
 
     def to_dict(self)-> dict:
-        return {
+        obj = {
             "id": str(self.id),
-            "user": str(self.user) if self.user else None,
             "content": str(self.content),
             "time": int(self.time),
         }
+        if not self.user is None:
+            obj["user"] = str(self.user)
+        return obj
 
     def to_json(self)-> str:
         return json.dumps(self.to_dict())

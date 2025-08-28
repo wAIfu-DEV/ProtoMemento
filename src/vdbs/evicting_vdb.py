@@ -1,5 +1,5 @@
 from src.memory import Memory, QueriedMemory
-from src.vector_database import VectorDataBase
+from src.vdbs.vector_database import VectorDataBase
 
 # TODO: implement eviction
 class EvictingVdb(VectorDataBase):
@@ -13,7 +13,7 @@ class EvictingVdb(VectorDataBase):
         self.dest = dest_vdb
         self.max_size = max_size_before_evict
         return
-    
+
 
     def _evict_oldest(self, coll_name: str)-> None:
         mem = self.wrapped.pop_oldest(coll_name)
@@ -57,7 +57,6 @@ class EvictingVdb(VectorDataBase):
         return self.wrapped.pop_oldest(coll_name)
 
 
-    # TODO: add wss message for eviction
     def evict_all(self, coll_name: str)-> None:
         while self.wrapped.count() > 0:
             self._evict_oldest(coll_name)

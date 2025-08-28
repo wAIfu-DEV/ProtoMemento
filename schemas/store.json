@@ -1,0 +1,84 @@
+{
+    "$defs": {
+        "Memory": {
+            "properties": {
+                "id": {
+                    "title": "Id",
+                    "type": "string"
+                },
+                "user": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "title": "User"
+                },
+                "content": {
+                    "title": "Content",
+                    "type": "string"
+                },
+                "time": {
+                    "title": "Time",
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "id",
+                "user",
+                "content",
+                "time"
+            ],
+            "title": "Memory",
+            "type": "object"
+        }
+    },
+    "properties": {
+        "type": {
+            "const": "store",
+            "title": "Type",
+            "type": "string"
+        },
+        "uid": {
+            "title": "Uid",
+            "type": "string"
+        },
+        "ai_name": {
+            "title": "Ai Name",
+            "type": "string"
+        },
+        "memories": {
+            "items": {
+                "$ref": "#/$defs/Memory"
+            },
+            "title": "Memories",
+            "type": "array"
+        },
+        "to": {
+            "items": {
+                "enum": [
+                    "stm",
+                    "ltm",
+                    "users"
+                ],
+                "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "To",
+            "type": "array"
+        }
+    },
+    "required": [
+        "type",
+        "uid",
+        "ai_name",
+        "memories",
+        "to"
+    ],
+    "title": "MsgStore",
+    "type": "object"
+}
