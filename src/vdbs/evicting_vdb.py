@@ -60,7 +60,7 @@ class EvictingVdb(VectorDataBase):
 
 
     def evict_all(self, coll_name: str)-> None:
-        while self.wrapped.count() > 0:
+        while self.wrapped.count(coll_name) > 0:
             self._evict_oldest(coll_name)
         return
         
