@@ -89,17 +89,17 @@ class WssHandler:
             try:
                 obj: dict = json.loads(data)
             except Exception as e:
-                self._send_error(conn, e)
+                await self._send_error(conn, e)
                 continue
 
             if not "type" in obj:
-                self._send_error(conn, TypeError('missing field "type" in message from client'))
+                await self._send_error(conn, TypeError('missing field "type" in message from client'))
                 continue
 
             msg_type = obj.get("type", "unhandled")
 
             if not isinstance(msg_type, str):
-                self._send_error(conn, TypeError('invalid type for value of field "type" in message from client'))
+                await self._send_error(conn, TypeError('invalid type for value of field "type" in message from client'))
                 continue
 
             msg_handler = self.handlers.get(msg_type, self._on_unhandled)
@@ -109,7 +109,7 @@ class WssHandler:
             except ConnectionClosed:
                 return
             except Exception as e:
-                self._send_error(conn, e, obj["uid"] if "uid" in obj else None)
+                await self._send_error(conn, e, obj["uid"] if "uid" in obj else None)
                 continue
             continue
         
