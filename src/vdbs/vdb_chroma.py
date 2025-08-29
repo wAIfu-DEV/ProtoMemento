@@ -70,7 +70,7 @@ class VdbChroma(VectorDataBase):
         )
 
         if self.size_limit >= 0:
-            self._restrict_size()
+            self._restrict_size(coll_name)
         return
 
 
