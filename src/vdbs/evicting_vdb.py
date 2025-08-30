@@ -64,4 +64,7 @@ class EvictingVdb(VectorDataBase):
         while self.wrapped.count(coll_name) > 0:
             self._evict_oldest(coll_name)
         return
+    
+    def get_collection_names(self)-> list[str]:
+        return self.wrapped.get_collection_names()
         

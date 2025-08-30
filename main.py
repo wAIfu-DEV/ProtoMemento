@@ -13,6 +13,12 @@ from src.db_bundle import DbBundle
 from src.wss_handler import WssHandler
 
 
+async def periodic_decay(decay_vdb: DecayingVdb):
+    while True:
+        decay_vdb.decay_all()
+        await asyncio.sleep(60 * 60 * 12) # every 6 hours, will skip if date diff < 1
+
+
 async def main():
     logging.basicConfig(
         format='[%(asctime)s][%(filename)s:%(lineno)s][%(name)s.%(funcName)s] %(message)s',
@@ -45,6 +51,9 @@ async def main():
     user_db = UserDatabase(size_limit_per_user=conf.user_db.max_size_per_user)
 
     bundle = DbBundle(short=short_evicting, long=long_decaying, users=user_db)
+
+    # decay routine
+    asyncio.create_task(periodic_decay(long_decaying))
 
     wss_handler = WssHandler(database_bundle=bundle, config=conf, env=env)
     async with serve(wss_handler.handle, host=conf.wss.host, port=conf.wss.port) as wss:

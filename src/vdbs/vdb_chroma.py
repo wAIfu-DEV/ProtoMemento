@@ -137,3 +137,8 @@ class VdbChroma(VectorDataBase):
 
     def count(self, coll_name: str)-> int:
         return self._get_collection(coll_name).count()
+    
+    
+    def get_collection_names(self)-> list[str]:
+        colls = self.client.list_collections()
+        return [x.name for x in colls]

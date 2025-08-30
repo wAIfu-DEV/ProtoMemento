@@ -18,16 +18,13 @@ class DecayingVdb(VectorDataBase):
         self.wrapped = wrapped_vdb
         os.makedirs(self._DECAY_META_DIR, exist_ok=True)
         return
-    
-
-    def _meta_path(self, coll_name: str) -> str:
-        safe_name = coll_name.replace("/", "_")
-        return os.path.join(self._DECAY_META_DIR, f"{safe_name}_decay.json")
 
 
-    def _load_last_run(self, coll_name: str) -> datetime.datetime:
-        path = self._meta_path(coll_name)
+    def _load_last_run(self) -> datetime.datetime:
+        path = os.path.join(self._DECAY_META_DIR, f"decay.json")
+
         if not os.path.isfile(path):
+            self._save_last_run(datetime.datetime.now(tz=datetime.timezone.utc))
             return datetime.datetime.now(tz=datetime.timezone.utc)
 
         with open(path, "r", encoding="utf-8") as f:
@@ -39,8 +36,8 @@ class DecayingVdb(VectorDataBase):
         return datetime.datetime.now(tz=datetime.timezone.utc)
 
 
-    def _save_last_run(self, coll_name: str, when: datetime.datetime) -> None:
-        path = self._meta_path(coll_name)
+    def _save_last_run(self, when: datetime.datetime) -> None:
+        path = os.path.join(self._DECAY_META_DIR, f"decay.json")
         with open(path, "w", encoding="utf-8") as f:
             json.dump({"last_run": when.timestamp()}, f)
 
@@ -70,63 +67,72 @@ class DecayingVdb(VectorDataBase):
 
     def pop_oldest(self, coll_name: str, n: int = 1)-> list[Memory]:
         return self.wrapped.pop_oldest(coll_name, n)
+    
+
+    def get_collection_names(self)-> list[str]:
+        return self.wrapped.get_collection_names()
 
 
-    def decay_all(self, coll_name: str)-> None:
-        self.logger.info("running decay for collection '%s'...", coll_name)
+    def decay_all(self)-> None:
+        self.logger.info("running decay for all collections...")
 
-        last_run = self._load_last_run(coll_name)
+        last_run = self._load_last_run()
         now = datetime.datetime.now(tz=datetime.timezone.utc)
         elapsed_seconds = (now - last_run).total_seconds()
         elapsed_days = int(elapsed_seconds // (24 * 60 * 60))
 
         if elapsed_days <= 0:
-            self.logger.debug("decay skipped – only %.2f seconds since last run.", elapsed_seconds)
+            self.logger.info("decay skipped – only %.2f seconds since last run.", elapsed_seconds)
             return
 
         self.logger.info("decay interval: %d day(s) since %s.", elapsed_days, last_run.isoformat())
 
-        total = self.wrapped.count(coll_name)
-        if total == 0:
-            self.logger.debug("collection empty – nothing to decay.")
-            self._save_last_run(coll_name, now)
-            return
+        collections = self.wrapped.get_collection_names()
 
-        processed = 0
-        while processed < total:
-            # removes _CHUNK_SIZE memories from the front of vdb
-            chunk = self.wrapped.pop_oldest(
-                coll_name,
-                n=max(min(self._CHUNK_SIZE, total - processed), 0)
-            )
+        for coll_name in collections:
+            self.logger.info("running decay for collection %s", coll_name)
 
-            if len(chunk) == 0:
-                break
+            total = self.wrapped.count(coll_name)
+            if total == 0:
+                self.logger.info("collection empty – nothing to decay.")
+                self._save_last_run(coll_name, now)
+                continue
 
-            for mem in chunk:
-                if mem.lifetime is None:
-                    self.logger.debug("expiring memory %s (lifetime is None).", mem.id)
-                    continue
-            
-                # TODO: evaluate usefulness, acts as protection of core memories
-                if (not mem.score is None) and mem.score > 0.85:
+            processed = 0
+            while processed < total:
+                # removes _CHUNK_SIZE memories from the front of vdb
+                chunk = self.wrapped.pop_oldest(
+                    coll_name,
+                    n=max(min(self._CHUNK_SIZE, total - processed), 0)
+                )
+
+                if len(chunk) == 0:
+                    break
+
+                for mem in chunk:
+                    if mem.lifetime is None:
+                        self.logger.info("expiring memory %s (lifetime is None).", mem.id)
+                        continue
+                
+                    # TODO: evaluate usefulness, acts as protection of core memories
+                    if (not mem.score is None) and mem.score > 0.85:
+                        self.wrapped.store(coll_name, mem)
+                        continue
+
+                    new_life = mem.lifetime - elapsed_days
+                    if new_life <= 0:
+                        # memory death
+                        self.logger.info("expiring memory %s (lifetime %d → %d).", mem.id, mem.lifetime, new_life)
+                        continue
+
+                    # update memory
+                    mem.lifetime = new_life
                     self.wrapped.store(coll_name, mem)
-                    continue
 
-                new_life = mem.lifetime - elapsed_days
-                if new_life <= 0:
-                    # memory death
-                    self.logger.debug("expiring memory %s (lifetime %d → %d).", mem.id, mem.lifetime, new_life)
-                    continue
+                processed += len(chunk)
+                self.logger.info("processed %d/%d memories for collection '%s'.", processed, total, coll_name)
 
-                # update memory
-                mem.lifetime = new_life
-                self.wrapped.store(coll_name, mem)
-
-            processed += len(chunk)
-            self.logger.debug("processed %d/%d memories for collection '%s'.", processed, total, coll_name)
-
-        self._save_last_run(coll_name, now)
-        self.logger.info("decay completed for collection '%s' – %d day(s) applied.", coll_name, elapsed_days)
+        self._save_last_run(now)
+        self.logger.info("decay completed for all collection - %d day(s) applied.", elapsed_days)
         return
         

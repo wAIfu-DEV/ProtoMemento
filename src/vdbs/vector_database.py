@@ -21,4 +21,7 @@ class VectorDataBase:
     
     def count(self, coll_name: str)-> int:
         return 0
+    
+    def get_collection_names(self)-> list[str]:
+        return []
         
