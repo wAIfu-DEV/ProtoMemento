@@ -198,18 +198,18 @@ class WssHandler:
             "summary": res.summary,
         })
 
-        # TODO: use score to determine lifetime
-        score = (res.emotional_intensity + res.importance) / 2.0
-        mem_time = int(time.time() * 1000.0)
+        mem_time = int(time.time() * 1000.0) # timestamp in ms
 
-        # TODO: implement score system
+        score = (res.emotional_intensity + res.importance) / 2.0
+        lifetime = score * self.config.long_vdb.max_memory_lifetime
+
         self.dbs.short_term.store(message.ai_name, Memory(
             id=str(uuid.uuid4()),
             content=res.summary,
             user=None,
             time=mem_time,
             score=score,
-            lifetime=-1, # still a placeholder until decay system exists
+            lifetime=lifetime,
         ))
 
         for rem in res.remember:
@@ -219,7 +219,7 @@ class WssHandler:
                 user=rem.user,
                 time=mem_time,
                 score=score,
-                lifetime=-1 # placeholder
+                lifetime=lifetime,
             )
             self.dbs.short_term.store(message.ai_name, mem)
             if not rem.user is None:

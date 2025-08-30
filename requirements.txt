@@ -2,4 +2,3 @@ websockets
 chromadb
 jsonschema
 openai
-jsonc-parser

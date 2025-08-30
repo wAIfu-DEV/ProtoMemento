@@ -1,0 +1,23 @@
+{
+    "wss": {
+        "host": "127.0.0.1",
+        "port": 4286
+    },
+    "openllm": {
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini",
+        "temp": 1.0,
+        "max_completion_tokens": 1000
+    },
+    "short_vdb": {
+        "progressive_eviction": true,
+        "max_size_before_evict": 500
+    },
+    "long_vdb": {
+        "max_size": 5000,
+        "max_memory_lifetime": 180
+    },
+    "user_db": {
+        "max_size_per_user": 100
+    }
+}
