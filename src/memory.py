@@ -58,7 +58,7 @@ class QueriedMemory:
 
     def to_dict(self)-> dict:
         return {
-            "memory": self.memory.to_json(),
+            "memory": self.memory.to_dict(),
             "distance": float(self.distance),
         }
     

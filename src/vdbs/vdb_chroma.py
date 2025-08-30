@@ -107,7 +107,7 @@ class VdbChroma(VectorDataBase):
         return final
 
 
-    def pop_oldest(self, coll_name: str, n: int = 1)-> list[Memory]:
+    def pop_oldest(self, coll_name: str, n: int = 1) -> list[Memory]:
         coll = self._get_collection(coll_name)
         res = coll.get(ids=None, offset=0, limit=n)
 

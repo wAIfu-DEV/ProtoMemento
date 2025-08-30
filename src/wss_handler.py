@@ -89,17 +89,17 @@ class WssHandler:
             try:
                 obj: dict = json.loads(data)
             except Exception as e:
-                self._send_error(conn, e)
+                await self._send_error(conn, e)
                 continue
 
             if not "type" in obj:
-                self._send_error(conn, TypeError('missing field "type" in message from client'))
+                await self._send_error(conn, TypeError('missing field "type" in message from client'))
                 continue
 
             msg_type = obj.get("type", "unhandled")
 
             if not isinstance(msg_type, str):
-                self._send_error(conn, TypeError('invalid type for value of field "type" in message from client'))
+                await self._send_error(conn, TypeError('invalid type for value of field "type" in message from client'))
                 continue
 
             msg_handler = self.handlers.get(msg_type, self._on_unhandled)
@@ -109,7 +109,7 @@ class WssHandler:
             except ConnectionClosed:
                 return
             except Exception as e:
-                self._send_error(conn, e, obj["uid"] if "uid" in obj else None)
+                await self._send_error(conn, e, obj["uid"] if "uid" in obj else None)
                 continue
             continue
         
@@ -204,18 +204,22 @@ class WssHandler:
 
         # TODO: implement score system
         self.dbs.short_term.store(message.ai_name, Memory(
-            id=uuid.uuid4(),
+            id=str(uuid.uuid4()),
             content=res.summary,
             user=None,
             time=mem_time,
+            score=score,
+            lifetime=-1, # still a placeholder until decay system exists
         ))
 
         for rem in res.remember:
             mem = Memory(
-                id=uuid.uuid4(),
+                id=str(uuid.uuid4()),
                 content=rem.text,
                 user=rem.user,
                 time=mem_time,
+                score=score,
+                lifetime=-1 # placeholder
             )
             self.dbs.short_term.store(message.ai_name, mem)
             if not rem.user is None:
