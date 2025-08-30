@@ -18,7 +18,6 @@ class EvictingVdb(VectorDataBase):
 
 
     def _evict_oldest(self, coll_name: str)-> None:
-        
         mem = self.wrapped.pop_oldest(coll_name)
         self.dest.store(coll_name, mem)
 

@@ -204,18 +204,22 @@ class WssHandler:
 
         # TODO: implement score system
         self.dbs.short_term.store(message.ai_name, Memory(
-            id=uuid.uuid4(),
+            id=str(uuid.uuid4()),
             content=res.summary,
             user=None,
             time=mem_time,
+            score=score,
+            lifetime=-1, # still a placeholder until decay system exists
         ))
 
         for rem in res.remember:
             mem = Memory(
-                id=uuid.uuid4(),
+                id=str(uuid.uuid4()),
                 content=rem.text,
                 user=rem.user,
                 time=mem_time,
+                score=score,
+                lifetime=-1 # placeholder
             )
             self.dbs.short_term.store(message.ai_name, mem)
             if not rem.user is None:
