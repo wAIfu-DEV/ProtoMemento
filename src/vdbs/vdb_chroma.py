@@ -107,26 +107,26 @@ class VdbChroma(VectorDataBase):
         return final
 
 
-    def pop_oldest(self, coll_name: str)-> Memory:
+    def pop_oldest(self, coll_name: str, n: int = 1) -> list[Memory]:
         coll = self._get_collection(coll_name)
-        if coll.count() == 0:
-            return None
+        res = coll.get(ids=None, offset=0, limit=n)
 
-        res = coll.get(ids=None, offset=0, limit=1)
-        if not res["ids"]:
-            return None
-            
-        meta = res["metadatas"][0]
-        mem: Memory = Memory(
-            id=      res["ids"][0],
-            content= res["documents"][0],
-            time=    meta.get("t", 0),
-            user=    meta.get("u", None),
-            score=   meta.get("s", None),
-            lifetime=meta.get("l", None),
-        )
-        coll.delete(ids=[mem.id])
-        return mem
+        final: list[Memory] = []
+        res_len = len(res["documents"])
+        for i in range(res_len):
+            meta = res["metadatas"][i]
+            mem: Memory = Memory(
+                id=      res["ids"][i],
+                content= res["documents"][i],
+                time=    meta.get("t", 0),
+                user=    meta.get("u", None),
+                score=   meta.get("s", None),
+                lifetime=meta.get("l", None),
+            )
+            final.append(mem)
+            coll.delete(ids=[mem.id])
+        
+        return final
 
 
     def clear(self, coll_name: str)-> None:
@@ -137,3 +137,8 @@ class VdbChroma(VectorDataBase):
 
     def count(self, coll_name: str)-> int:
         return self._get_collection(coll_name).count()
+    
+    
+    def get_collection_names(self)-> list[str]:
+        colls = self.client.list_collections()
+        return [x.name for x in colls]

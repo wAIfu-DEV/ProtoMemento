@@ -13,12 +13,15 @@ class VectorDataBase:
     def remove(self, coll_name: str, memory_id: str)-> None:
         return
 
-    def pop_oldest(self, coll_name: str)-> Memory:
-        return Memory()
+    def pop_oldest(self, coll_name: str, n: int = 1)-> list[Memory]:
+        return []
     
     def clear(self, coll_name: str)-> None:
         return
     
     def count(self, coll_name: str)-> int:
         return 0
+    
+    def get_collection_names(self)-> list[str]:
+        return []
         

@@ -1,2 +1,4 @@
 - implement score/lifetime with vector db
 - implement decay system
+- change relative paths to Path(__file__).parent
+- switch user database from JSON to CSV

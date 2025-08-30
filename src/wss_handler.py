@@ -223,7 +223,7 @@ class WssHandler:
             )
             self.dbs.short_term.store(message.ai_name, mem)
             if not rem.user is None:
-                self.dbs.users.store(message.ai_name, rem.user, mem)
+                self.dbs.users.store(coll_name=message.ai_name, user=rem.user, memory=mem)
          
         return
 

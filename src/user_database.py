@@ -86,7 +86,7 @@ class UserDatabase:
             self._init_user(coll_name, user)
         
         # TODO: move all dat to superior CSV
-        obj = self._read_user_file(user)
+        obj = self._read_user_file(coll_name, user)
 
         mems: list[dict] = obj.get("mems", None)
         if not mems:
@@ -98,7 +98,7 @@ class UserDatabase:
         mems.append(memory.to_dict())
         obj["mems"] = mems # dunno if python does hidden copies, better be safe
 
-        self._write_user_data(user, obj)
+        self._write_user_data(coll_name, user, obj)
         return
 
 
@@ -109,7 +109,7 @@ class UserDatabase:
         if not self._is_user_exist(coll_name, user):
             return []
         
-        obj = self._read_user_file(user)
+        obj = self._read_user_file(coll_name, user)
 
         mems: list[dict] = obj.get("mems", None)
         if not mems:

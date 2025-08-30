@@ -18,8 +18,9 @@ class EvictingVdb(VectorDataBase):
 
 
     def _evict_oldest(self, coll_name: str)-> None:
-        mem = self.wrapped.pop_oldest(coll_name)
-        self.dest.store(coll_name, mem)
+        mems = self.wrapped.pop_oldest(coll_name, n=1)
+        if len(mems) > 0:
+            self.dest.store(coll_name, mems[0])
 
 
     def _evict_overflow(self, coll_name: str)-> None:
@@ -55,8 +56,8 @@ class EvictingVdb(VectorDataBase):
         return self.wrapped.count(coll_name)
     
 
-    def pop_oldest(self, coll_name: str)-> Memory:
-        return self.wrapped.pop_oldest(coll_name)
+    def pop_oldest(self, coll_name: str, n: int = 1)-> list[Memory]:
+        return self.wrapped.pop_oldest(coll_name, n)
 
 
     def evict_all(self, coll_name: str) -> None:
@@ -68,4 +69,6 @@ class EvictingVdb(VectorDataBase):
             after = self.wrapped.count(coll_name)
             if after >= before:
                 break
-        
+    
+    def get_collection_names(self) -> list[str]:
+        return self.wrapped.get_collection_names()

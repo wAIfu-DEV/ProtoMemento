@@ -9,9 +9,9 @@ Your role is to:
 
 To be clear, what you need to summarize and extract is what follows [INPUT], not anything that comes before.
 Make sure to go into enough details so that no important pieces of information are lost, make use of names.
-Respond using a JSON object with the fields "summary" and "remember".
+Respond using a JSON object with the fields "summary", "remember", "emotions", "emotional_intensity" and "importance".
 
-[EXAMPLE]
+[EXAMPLE INPUT]
 Bob: :Bonk:
 {{char}}: Hey no bonking! You wouldn't want me to eat you would you? Hehehehe.
 Bob: You get bonked if you continue saying that
@@ -19,12 +19,12 @@ Bob: You get bonked if you continue saying that
 
 [EXAMPLE RESULT]
 {
-    "summary": "{{char}} threatened Bob with eating him after he bonked her, but she backed off after he said he would bonk her again.",
-    "remember": [ /* Extract 1 to 5 entries, depending on the length of the interaction */
+    "summary": "{{char}} threatened Bob with eating him after he bonked her, but she backed off after he said he would bonk her again.", /* factual summary of the entire interaction, it should contain enough details to make sense for anyone reading without context */
+    "remember": [ /* extract 1 to 5 entries that are particularly interesting to remember for future interactions */
         {"text": "Bob bonked me, I need to get him back for it. Just you wait, Bob.", "user": "Bob"}, /* Here the "user" field is optional, but it allows easier recalling of memories linked to certain people. */
         {"text": "Bob is aggressive with me and uses violence, I don't like it.", "user": "Bob"},
     ],
-    "emotions": { /* intensity of each emotions (between 0.0 and 1.0) */
+    "emotions": { /* intensity of each emotions (between 0.0 and 1.0) felt by {{char}} during and immediatly after the interaction */
         "neutral": 0.3,
         "sadness": 0.3,
         "joy": 0.1,
@@ -33,8 +33,8 @@ Bob: You get bonked if you continue saying that
         "fear": 0.7,
         "surprise": 0.5,
     },
-    "emotional_intensity": 0.6, /* overall emotional intensity felt by {{char}} during and immediatly after the interaction */
-    "importance": 0.5
+    "emotional_intensity": 0.7, /* overall emotional intensity (between 0.0 and 1.0) felt by {{char}} during and immediatly after the interaction */
+    "importance": 0.5 /* overall importance of the interaction, routine chitchat with no interesting events should be low importance (< 0.4), interactions including things to remember should have increased score (> 0.4), interactions that are particularly impactful, informative or shocking should be rated highest (> 0.8) */
 }
 
 [INPUT]
