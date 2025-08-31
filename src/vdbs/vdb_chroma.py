@@ -9,12 +9,14 @@ class VdbChroma(VectorDataBase):
     client: ClientAPI = None
     coll_cache: dict[str, Collection] = {}
     size_limit: int = -1
+    name: str
     logger: logging.Logger
 
 
     def __init__(self, db_name: str, size_limit: int = -1)-> None:
         self.logger = logging.getLogger(f"{self.__class__.__name__}({db_name})")
         self.size_limit = size_limit
+        self.name = db_name
 
         path = os.path.join(".", "vectors", db_name)
         os.makedirs(path, exist_ok=True)
@@ -29,13 +31,19 @@ class VdbChroma(VectorDataBase):
         return
 
 
+    def _unique_coll_name(self, coll_name: str)-> str:
+        return coll_name + f"_{self.name}"
+
+
     def _get_collection(self, coll_name: str)-> Collection:
+        unique_name = self._unique_coll_name(coll_name)
+
         collection: Collection
-        if not coll_name in self.coll_cache:
-            collection = self.client.get_or_create_collection(name=coll_name)
-            self.coll_cache[coll_name] = collection
+        if not unique_name in self.coll_cache:
+            collection = self.client.get_or_create_collection(name=unique_name)
+            self.coll_cache[unique_name] = collection
         else:
-            collection = self.coll_cache[coll_name]
+            collection = self.coll_cache[unique_name]
         return collection
 
 
@@ -133,8 +141,9 @@ class VdbChroma(VectorDataBase):
 
 
     def clear(self, coll_name: str)-> None:
-        self.client.delete_collection(coll_name)
-        self.coll_cache[coll_name] = self.client.create_collection(coll_name)
+        unique_name = self._unique_coll_name(coll_name)
+        self.client.delete_collection(unique_name)
+        self.coll_cache[unique_name] = self.client.create_collection(unique_name)
         return
     
 

@@ -88,6 +88,7 @@ class DecayingVdb(VectorDataBase):
         self.logger.info("decay interval: %d day(s) since %s.", elapsed_days, last_run.isoformat())
 
         collections = self.wrapped.get_collection_names()
+        self.logger.info("collection names: [%s]", ", ".join(collections))
 
         for coll_name in collections:
             self.logger.info("running decay for collection %s", coll_name)
