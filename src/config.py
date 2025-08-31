@@ -26,7 +26,7 @@ class LongVdbConfig(BaseModel):
 
 
 class UserDbConfig(BaseModel):
-    max_size_per_user: int = Field(100)
+    max_size_per_user: int = Field(25)
 
 
 class Config(BaseModel):

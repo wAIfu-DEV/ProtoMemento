@@ -18,6 +18,6 @@
         "max_memory_lifetime": 180
     },
     "user_db": {
-        "max_size_per_user": 100
+        "max_size_per_user": 25
     }
 }

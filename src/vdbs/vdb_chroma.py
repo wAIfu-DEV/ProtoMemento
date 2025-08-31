@@ -15,12 +15,15 @@ class VdbChroma(VectorDataBase):
     def __init__(self, db_name: str, size_limit: int = -1)-> None:
         self.logger = logging.getLogger(f"{self.__class__.__name__}({db_name})")
         self.size_limit = size_limit
+
+        path = os.path.join(".", "vectors", db_name)
+        os.makedirs(path, exist_ok=True)
+
         settings = Settings()
         settings.is_persistent = True
         settings.anonymized_telemetry = False
-        path = os.path.join(".", "vectors", db_name)
-        os.makedirs(path, exist_ok=True)
         settings.persist_directory = path
+
         self.client = Client(settings=settings)
         self.logger.info("initialized %s vector database", db_name)
         return

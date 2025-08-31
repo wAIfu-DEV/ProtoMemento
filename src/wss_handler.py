@@ -55,13 +55,14 @@ class WssHandler:
 
 
     async def _send(self, conn: ServerConnection, data: dict)-> None:
-        await conn.send(json.dumps(data), text=True)
+        json_data = json.dumps(data)
+        await conn.send(json_data, text=True)
+        self.logger.info("sent: %s", json_data)
 
 
     async def _send_error(self, conn: ServerConnection, e: Exception, id: str | None = None)-> None:
         err = str(e)
         tb = traceback.format_exc()
-        self.logger.error("wss handler error: %s\n%s", err, tb)
 
         obj = {
             "type": "error",
@@ -82,6 +83,7 @@ class WssHandler:
                 # Would limit to one connection per instance, but would make
                 # the app close by itself, which is massive.
                 # Would prevent addr already used errs
+                self.logger.info("connection closed on recv.")
                 return
 
             self.logger.info("received message: %s", data)
@@ -107,6 +109,7 @@ class WssHandler:
             try:
                 await msg_handler(conn, obj)
             except ConnectionClosed:
+                self.logger.info("connection closed on send.")
                 return
             except Exception as e:
                 await self._send_error(conn, e, obj["uid"] if "uid" in obj else None)
@@ -179,7 +182,8 @@ class WssHandler:
                     case "users":
                         if mem.user is None: continue # No user associated with mem
                         self.dbs.users.store(coll_name=message.ai_name, user=mem.user, memory=mem)
-
+        
+        self.logger.info("stored memories.")
         return
 
 
@@ -224,15 +228,18 @@ class WssHandler:
             self.dbs.short_term.store(message.ai_name, mem)
             if not rem.user is None:
                 self.dbs.users.store(coll_name=message.ai_name, user=rem.user, memory=mem)
-         
+        
+        self.logger.info("processed messages from client.")
         return
 
 
     async def _on_evict(self, conn: ServerConnection, obj: dict)-> None:
         message = MsgEvict.model_validate(obj)
         self.dbs.short_term.evict_all(message.ai_name)
+        self.logger.info("evicted messages from collection: %s", message.ai_name)
         return
 
 
     async def _on_unhandled(self, conn: ServerConnection, obj: dict)-> None:
+        self.logger.info("received unhandled message.")
         raise TypeError("Received message with unhandled message type: " + json.dumps(obj))
