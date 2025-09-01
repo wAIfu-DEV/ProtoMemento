@@ -7,7 +7,7 @@ from src.memory import Memory, QueriedMemory
 
 class VdbChroma(VectorDataBase):
     client: ClientAPI = None
-    coll_cache: dict[str, Collection] = {}
+    coll_cache: dict[str, Collection]
     size_limit: int = -1
     logger: logging.Logger
     name: str  # "short" or "long"
@@ -23,6 +23,7 @@ class VdbChroma(VectorDataBase):
         os.makedirs(path, exist_ok=True)
         settings.persist_directory = path
         self.client = Client(settings=settings)
+        self.coll_cache = {}  # instance-local cache
         self.logger.info("initialized %s vector database", db_name)
         return
 
