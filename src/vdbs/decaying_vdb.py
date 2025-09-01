@@ -21,25 +21,32 @@ class DecayingVdb(VectorDataBase):
 
 
     def _load_last_run(self) -> datetime.datetime:
-        path = os.path.join(self._DECAY_META_DIR, f"decay.json")
+        path = os.path.join(self._DECAY_META_DIR, "decay.json")
 
         if not os.path.isfile(path):
-            self._save_last_run(datetime.datetime.now(tz=datetime.timezone.utc))
-            return datetime.datetime.now(tz=datetime.timezone.utc)
+            now = datetime.datetime.now(tz=datetime.timezone.utc)
+            self._save_last_run(now)
+            return now
 
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
             ts = data.get("last_run")
-            if isinstance(ts, (int, float)):
-                return datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc)
-        
+            if isinstance(ts, str):
+                try:
+                    return datetime.datetime.fromisoformat(ts)
+                except ValueError:
+                    return datetime.datetime.now(tz=datetime.timezone.utc)
+            else:
+                now = datetime.datetime.now(tz=datetime.timezone.utc)
+                self._save_last_run(now)
+
         return datetime.datetime.now(tz=datetime.timezone.utc)
 
 
     def _save_last_run(self, when: datetime.datetime) -> None:
-        path = os.path.join(self._DECAY_META_DIR, f"decay.json")
+        path = os.path.join(self._DECAY_META_DIR, "decay.json")
         with open(path, "w", encoding="utf-8") as f:
-            json.dump({"last_run": when.timestamp()}, f)
+            json.dump({"last_run": when.isoformat()}, f)
 
 
     def store(self, coll_name: str, memory: Memory)-> None:
