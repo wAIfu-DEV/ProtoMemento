@@ -89,13 +89,14 @@ class UserDatabase:
         obj = self._read_user_file(coll_name, user)
 
         mems: list[dict] = obj.get("mems", None)
-        if not mems:
+        if mems is None:
             raise AssertionError('missing field "mems" in user file.')
         
+        mems.append(memory.to_dict())
+
         if self.size_limit_per_user >= 0 and len(mems) > self.size_limit_per_user:
             mems = mems[len(mems) - self.size_limit_per_user:] # rem first elems
         
-        mems.append(memory.to_dict())
         obj["mems"] = mems # dunno if python does hidden copies, better be safe
 
         self._write_user_data(coll_name, user, obj)
@@ -112,7 +113,7 @@ class UserDatabase:
         obj = self._read_user_file(coll_name, user)
 
         mems: list[dict] = obj.get("mems", None)
-        if not mems:
+        if mems is None:
             raise AssertionError('missing field "mems" in user file.')
         
         if len(mems) <= n:
