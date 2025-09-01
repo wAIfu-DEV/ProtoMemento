@@ -10,11 +10,12 @@ class VdbChroma(VectorDataBase):
     coll_cache: dict[str, Collection] = {}
     size_limit: int = -1
     logger: logging.Logger
-
+    name: str  # "short" or "long"
 
     def __init__(self, db_name: str, size_limit: int = -1)-> None:
         self.logger = logging.getLogger(f"{self.__class__.__name__}({db_name})")
         self.size_limit = size_limit
+        self.name = db_name
         settings = Settings()
         settings.is_persistent = True
         settings.anonymized_telemetry = False
@@ -25,14 +26,17 @@ class VdbChroma(VectorDataBase):
         self.logger.info("initialized %s vector database", db_name)
         return
 
+    def _get_qualified_name(self, coll_name: str) -> str:
+        return f"{coll_name}_{self.name}"
 
     def _get_collection(self, coll_name: str)-> Collection:
+        qualified_name = self._get_qualified_name(coll_name)
         collection: Collection
-        if not coll_name in self.coll_cache:
-            collection = self.client.get_or_create_collection(name=coll_name)
-            self.coll_cache[coll_name] = collection
+        if qualified_name not in self.coll_cache:
+            collection = self.client.get_or_create_collection(name=qualified_name)
+            self.coll_cache[qualified_name] = collection
         else:
-            collection = self.coll_cache[coll_name]
+            collection = self.coll_cache[qualified_name]
         return collection
 
 
@@ -130,8 +134,9 @@ class VdbChroma(VectorDataBase):
 
 
     def clear(self, coll_name: str)-> None:
-        self.client.delete_collection(coll_name)
-        self.coll_cache[coll_name] = self.client.create_collection(coll_name)
+        qualified_name = self._get_qualified_name(coll_name)
+        self.client.delete_collection(qualified_name)
+        self.coll_cache[qualified_name] = self.client.get_or_create_collection(name=qualified_name)
         return
     
 
