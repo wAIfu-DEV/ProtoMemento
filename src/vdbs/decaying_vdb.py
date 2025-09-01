@@ -5,7 +5,6 @@ import os
 from src.memory import Memory, QueriedMemory
 from src.vdbs.vector_database import VectorDataBase
 
-# TODO: implement decay
 class DecayingVdb(VectorDataBase):
     wrapped: VectorDataBase
     logger: logging.Logger
@@ -116,7 +115,7 @@ class DecayingVdb(VectorDataBase):
                         continue
                 
                     # TODO: evaluate usefulness, acts as protection of core memories
-                    if (not mem.score is None) and mem.score > 0.85:
+                    if mem.score is not None and mem.score > 0.85:
                         self.wrapped.store(coll_name, mem)
                         continue
 

@@ -68,7 +68,7 @@ class WssHandler:
             "type": "error",
             "error": f"{err}\n{tb}",
         }
-        if not id is None:
+        if id is not None:
             obj["uid"] = id
         await self._send(conn, obj)
 
@@ -192,7 +192,7 @@ class WssHandler:
         
         res = await self.ai.process(
             ai_name=message.ai_name,
-            context=message.context if not message.context is None else [],
+            context=message.context if message.context is not None else [],
             messages=message.messages,
         )
 
@@ -226,7 +226,7 @@ class WssHandler:
                 lifetime=lifetime,
             )
             self.dbs.short_term.store(message.ai_name, mem)
-            if not rem.user is None:
+            if rem.user is not None:
                 self.dbs.users.store(coll_name=message.ai_name, user=rem.user, memory=mem)
         
         self.logger.info("processed messages from client.")

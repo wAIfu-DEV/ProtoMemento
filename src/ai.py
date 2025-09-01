@@ -63,7 +63,7 @@ class AI:
             name = ""
             match msg.role:
                 case "assistant": name = ai_name
-                case "user":      name = msg.name if not msg.name is None else "User"
+                case "user":      name = msg.name if msg.name is not None else "User"
                 case "system":    name = "SYSTEM"
                 case _:           continue # skip any messages that aren't standard
             msg_str += f"{name}: {msg.content}\n"
