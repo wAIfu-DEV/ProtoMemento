@@ -1,7 +1,7 @@
 import json
 import os
 from typing import Literal, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.memory import Memory
 
