@@ -21,7 +21,7 @@ class MsgQuery(BaseModel):
     @field_validator("n")
     @classmethod
     def _lens_match(cls, v, info):
-        from_ = info.data.get("from")
+        from_ = info.data.get("from_")
         if from_ is not None and len(v) != len(from_):
             raise ValueError("length of 'n' must match length of 'from'")
         return v
