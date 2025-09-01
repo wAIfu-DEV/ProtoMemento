@@ -1,6 +1,7 @@
 import logging
 import os
 from chromadb import Client, ClientAPI, Collection, Settings
+from chromadb.errors import NotFoundError
 
 from src.vdbs.vector_database import VectorDataBase
 from src.memory import Memory, QueriedMemory
@@ -134,7 +135,10 @@ class VdbChroma(VectorDataBase):
 
     def clear(self, coll_name: str)-> None:
         qualified_name = self._get_qualified_name(coll_name)
-        self.client.delete_collection(qualified_name)
+        try:
+            self.client.delete_collection(qualified_name)
+        except NotFoundError:
+            pass
         self.coll_cache[qualified_name] = self.client.get_or_create_collection(name=qualified_name)
         return
     
