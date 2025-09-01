@@ -35,7 +35,7 @@ async def main():
 
     logger.info("initializing databases...")
     short_size = conf.short_vdb.max_size_before_evict + 10\
-                      if conf.short_vdb.max_size_before_evict > 0\
+                      if conf.short_vdb.progressive_eviction and conf.short_vdb.max_size_before_evict > 0\
                       else -1
 
     short_vdb = VdbChroma(db_name="short", size_limit=short_size)
