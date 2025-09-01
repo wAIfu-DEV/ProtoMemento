@@ -1,0 +1,22 @@
+{
+    "convo": [
+        {
+            "role": "user",
+            "content": "Look, I need you to listen to this secret okay?",
+            "name": "David"
+        },
+        {
+            "role": "assistant",
+            "content": "Sure, what is it?"
+        },
+        {
+            "role": "user",
+            "content": "I'm actually French and I eat snails in secret when no one is watching.",
+            "name": "David"
+        },
+        {
+            "role": "assistant",
+            "content": "WHAT??? I FUNKING KNEW IT!"
+        }
+    ]
+}

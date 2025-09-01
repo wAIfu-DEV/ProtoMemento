@@ -35,6 +35,7 @@ async def main():
             match inp:
                 case "store":
                     content = await async_input("content: ")
+
                     user = await async_input("user (or empty): ")
                     user = None if user == "" else user
                     score = float(await async_input("score: "))
@@ -90,6 +91,21 @@ async def main():
                         "ai_name": ai_name,
                     })
                     await ws.send(data, text=True)
+                case "process":
+                    ai_name = await async_input("ai name: ")
+                    context = None
+                    with open("./example_client/conversation.json", "r", encoding="utf-8") as f:
+                        messages = json.load(f)
+                    
+                    data = json.dumps({
+                        "uid": str(uuid.uuid4()),
+                        "type": "process",
+                        "ai_name": ai_name,
+                        "context": context,
+                        "messages": messages["convo"]
+                    })
+                    await ws.send(data, text=True)
+                    
 
 
 if __name__ == "__main__":

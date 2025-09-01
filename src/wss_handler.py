@@ -1,4 +1,5 @@
 import json
+from math import floor
 import time
 import traceback
 import uuid
@@ -205,7 +206,7 @@ class WssHandler:
         mem_time = int(time.time() * 1000.0) # timestamp in ms
 
         score = (res.emotional_intensity + res.importance) / 2.0
-        lifetime = score * self.config.long_vdb.max_memory_lifetime
+        lifetime = floor(score * self.config.long_vdb.max_memory_lifetime)
 
         self.dbs.short_term.store(message.ai_name, Memory(
             id=str(uuid.uuid4()),

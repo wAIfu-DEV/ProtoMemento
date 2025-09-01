@@ -11,16 +11,16 @@ To be clear, what you need to summarize and extract is what follows [INPUT], not
 Make sure to go into enough details so that no important pieces of information are lost, make use of names.
 Respond using a JSON object with the fields "summary", "remember", "emotions", "emotional_intensity" and "importance".
 
-[EXAMPLE INPUT]
+[EXAMPLE 1 INPUT]
 Bob: :Bonk:
 {{char}}: Hey no bonking! You wouldn't want me to eat you would you? Hehehehe.
 Bob: You get bonked if you continue saying that
 {{char}}: Okay okay I will stop, for now. Don't bonk me again please.
 
-[EXAMPLE RESULT]
+[EXAMPLE 1 RESULT]
 {
     "summary": "{{char}} threatened Bob with eating him after he bonked her, but she backed off after he said he would bonk her again.", /* factual summary of the entire interaction, it should contain enough details to make sense for anyone reading without context */
-    "remember": [ /* extract 1 to 5 entries that are particularly interesting to remember for future interactions */
+    "remember": [ /* extract 1 to 5 entries that are particularly interesting to remember for future interactions from the perspective of {{char}}, speak about how they feel abou it */
         {"text": "Bob bonked me, I need to get him back for it. Just you wait, Bob.", "user": "Bob"}, /* Here the "user" field is optional, but it allows easier recalling of memories linked to certain people. */
         {"text": "Bob is aggressive with me and uses violence, I don't like it.", "user": "Bob"},
     ],
@@ -35,6 +35,34 @@ Bob: You get bonked if you continue saying that
     },
     "emotional_intensity": 0.7, /* overall emotional intensity (between 0.0 and 1.0) felt by {{char}} during and immediatly after the interaction */
     "importance": 0.5 /* overall importance of the interaction, routine chitchat with no interesting events should be low importance (< 0.4), interactions including things to remember should have increased score (> 0.4), interactions that are particularly impactful, informative or shocking should be rated highest (> 0.8) */
+}
+
+[EXAMPLE 2 INPUT] (boring, uninteresting routine chitchat)
+Robert: Hello, how are you?
+{{char}}: Hi, I am fine thank you.
+Robert: Wow that's great. Sure am glad you're doing okay.
+{{char}}: How's life?
+
+[EXAMPLE 2 RESULT]
+{
+    "summary": "{{char}} and Robert exchange greetings, asking each other how they are doing.",
+    "remember": [
+        {
+            "text": "Robert checked in on my well-being, which made me feel appreciated.",
+            "user": "Robert"
+        }
+    ],
+    "emotions": {
+        "neutral": 0.6,
+        "sadness": 0.0,
+        "joy": 0.3,
+        "love": 0.1,
+        "anger": 0.0,
+        "fear": 0.0,
+        "surprise": 0.0
+    },
+    "emotional_intensity": 0.1, /* no strong feelings expressed or felt in this example */
+    "importance": 0.1 /* nothing of importance or to remember is present in this example */
 }
 
 [INPUT]

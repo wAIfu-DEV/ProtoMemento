@@ -1,3 +1,4 @@
+import logging
 import re
 import openai
 
@@ -9,8 +10,8 @@ from src.messages import OpenLlmMsg
 
 
 class RememberEntry(BaseModel):
-    text: str = Field(..., max_length=80)
-    user: Optional[str] = Field(default=None, max_length=25)
+    text: str = Field(..., max_length=250)
+    user: Optional[str] = Field(default=None, max_length=80)
 
 class EmotionState(BaseModel):
     neutral: float = Field(..., ge=0.0, le=1.0, multiple_of=0.1)
@@ -22,7 +23,7 @@ class EmotionState(BaseModel):
     surprise: float = Field(..., ge=0.0, le=1.0, multiple_of=0.1)
 
 class ProcessResult(BaseModel):
-    summary: str = Field(..., max_length=150)
+    summary: str = Field(..., max_length=250)
     remember: List[RememberEntry] = Field(..., min_length=1, max_length=10)
     emotions: EmotionState = Field(...)
     emotional_intensity: float = Field(..., ge=0.0, le=1.0, multiple_of=0.1)
@@ -34,6 +35,7 @@ class AI:
     client: openai.Client
     model_name: str
     prompt_cache: dict[str, str] = {}
+    logger: logging.Logger
 
 
     def __init__(self, base_url: str | None = None, api_key: str | None = None, model_name: str = "", config: Config = None):
@@ -43,6 +45,7 @@ class AI:
             base_url=base_url,
         )
         self.model_name = model_name
+        self.logger = logging.getLogger(self.__class__.__name__)
         return
     
 
@@ -83,5 +86,9 @@ class AI:
             max_completion_tokens=self.config.openllm.max_completion_tokens,
             response_format=ProcessResult,
         )
-        return completion.choices[0].message.parsed
+        parsed = completion.choices[0].message.parsed
+
+        self.logger.info("process result: %s", parsed.model_dump_json(indent=4))
+
+        return parsed
         
