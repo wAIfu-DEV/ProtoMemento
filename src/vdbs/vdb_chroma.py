@@ -57,14 +57,13 @@ class VdbChroma(VectorDataBase):
 
 
     def store(self, coll_name: str, memory: Memory)-> None:
-        metadata = {
-            "t": memory.time,
-            "u": memory.user,
-        }
+        metadata = {"t": memory.time}
 
-        if not memory.score is None:
+        if memory.user:                    # only add when non-empty truthy
+            metadata["u"] = memory.user
+        if memory.score is not None:
             metadata["s"] = memory.score
-        if not memory.lifetime is None:
+        if memory.lifetime is not None:
             metadata["l"] = memory.lifetime
 
         self._get_collection(coll_name).add(
@@ -75,7 +74,6 @@ class VdbChroma(VectorDataBase):
 
         if self.size_limit >= 0:
             self._restrict_size(coll_name)
-        return
 
 
     def remove(self, coll_name: str, memory_id: str)-> None:
