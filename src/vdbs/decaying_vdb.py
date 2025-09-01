@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+from math import floor
 import os
 from src.memory import Memory, QueriedMemory
 from src.vdbs.vector_database import VectorDataBase
@@ -87,7 +88,7 @@ class DecayingVdb(VectorDataBase):
         self.logger.info("decay interval: %d day(s) since %s.", elapsed_days, last_run.isoformat())
 
         collections = self.wrapped.get_collection_names()
-        self.logger.info("collection names: [%s]", ", ".join(collections))
+        self.logger.info("collection names: [ %s ]", ", ".join(collections))
 
         for coll_name in collections:
             self.logger.info("running decay for collection %s", coll_name)
@@ -114,12 +115,15 @@ class DecayingVdb(VectorDataBase):
                         self.logger.info("expiring memory %s (lifetime is None).", mem.id)
                         continue
                 
+                    decay_amount = elapsed_days
+                        
                     # TODO: evaluate usefulness, acts as protection of core memories
                     if mem.score is not None and mem.score > 0.85:
-                        self.wrapped.store(coll_name, mem)
-                        continue
+                        # won't affect the core memory if the elapsed days == 1
+                        # not sure if it's a good idea.
+                        decay_amount = floor(decay_amount / 2) # TODO: use config
 
-                    new_life = mem.lifetime - elapsed_days
+                    new_life = mem.lifetime - decay_amount
                     if new_life <= 0:
                         # memory death
                         self.logger.info("expiring memory %s (lifetime %d → %d).", mem.id, mem.lifetime, new_life)

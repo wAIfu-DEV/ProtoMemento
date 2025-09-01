@@ -10,7 +10,6 @@ from websockets.asyncio.client import connect, ClientConnection
 async def recv_routine(ws: ClientConnection):
     while True:
         await asyncio.sleep(0)
-
         try:
             async with asyncio.timeout(0.5):
                 data = await ws.recv(decode=True)
@@ -32,7 +31,7 @@ async def main():
         while True:
             await asyncio.sleep(0)
 
-            inp = await async_input("msg type (store, query): ")
+            inp = await async_input("msg type (store, query, evict): ")
             match inp:
                 case "store":
                     content = await async_input("content: ")
@@ -80,6 +79,15 @@ async def main():
                         "user": user,
                         "from": [from_],
                         "n": [n],
+                    })
+                    await ws.send(data, text=True)
+                case "evict":
+                    ai_name = await async_input("ai name: ")
+
+                    data = json.dumps({
+                        "uid": str(uuid.uuid4()),
+                        "type": "evict",
+                        "ai_name": ai_name,
                     })
                     await ws.send(data, text=True)
 
