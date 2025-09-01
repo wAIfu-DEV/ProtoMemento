@@ -44,7 +44,7 @@ class MsgStore(BaseModel):
 class OpenLlmMsg(BaseModel):
     role: Literal["assistant", "user", "system"] | str = Field(...)
     content: str = Field(...)
-    name: Optional[str] = Field(...)
+    name: Optional[str] = Field(default=None)
 
     class Config:
         populate_by_name = True
@@ -54,7 +54,7 @@ class MsgProcess(BaseModel):
     type: Literal["process"] = Field(...)
     uid: str = Field(...)
     ai_name: str = Field(...)
-    context: Optional[List[OpenLlmMsg]] = Field(...)
+    context: Optional[List[OpenLlmMsg]] = Field(default=None)
     messages: List[OpenLlmMsg] = Field(...)
 
     class Config:

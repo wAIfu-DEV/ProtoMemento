@@ -13,6 +13,7 @@ class VdbChroma(VectorDataBase):
     name: str
     logger: logging.Logger
 
+
     def __init__(self, db_name: str, size_limit: int = -1)-> None:
         self.logger = logging.getLogger(f"{self.__class__.__name__}({db_name})")
         self.size_limit = size_limit
@@ -30,6 +31,7 @@ class VdbChroma(VectorDataBase):
         self.coll_cache = {}  # instance-local cache
         self.logger.info("initialized %s vector database", db_name)
         return
+
 
     def _unique_coll_name(self, coll_name: str)-> str:
         return coll_name + f"_{self.name}"
@@ -146,12 +148,12 @@ class VdbChroma(VectorDataBase):
             pass
         self.coll_cache[unique_name] = self.client.get_or_create_collection(name=unique_name)
         return
-    
+
 
     def count(self, coll_name: str)-> int:
         return self._get_collection(coll_name).count()
-    
-    
+
+
     def get_collection_names(self) -> list[str]:
         suffix = f"_{self.name}"
         all_cols = self.client.list_collections()

@@ -9,9 +9,9 @@ class Memory(BaseModel):
     content: str = Field(...)
     time: int = Field(...)
 
-    user: Optional[str] = Field(...)
-    score: Optional[float] = Field(...)
-    lifetime: Optional[int] = Field(...)
+    user: Optional[str] = Field(default=None)
+    score: Optional[float] = Field(default=None)
+    lifetime: Optional[int] = Field(default=None)
 
     class Config:
         populate_by_name = True
@@ -35,11 +35,11 @@ class Memory(BaseModel):
             "time": int(self.time),
         }
 
-        if not self.user is None:
+        if self.user is not None:
             obj["user"] = str(self.user)
-        if not self.score is None:
+        if self.score is not None:
             obj["score"] = float(self.score)
-        if not self.lifetime is None:
+        if self.lifetime is not None:
             obj["lifetime"] = int(self.lifetime)
         return obj
 
