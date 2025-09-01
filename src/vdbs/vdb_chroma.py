@@ -10,35 +10,40 @@ class VdbChroma(VectorDataBase):
     client: ClientAPI = None
     coll_cache: dict[str, Collection]
     size_limit: int = -1
+    name: str
     logger: logging.Logger
-    name: str  # "short" or "long"
 
     def __init__(self, db_name: str, size_limit: int = -1)-> None:
         self.logger = logging.getLogger(f"{self.__class__.__name__}({db_name})")
         self.size_limit = size_limit
         self.name = db_name
+
+        path = os.path.join(".", "vectors", db_name)
+        os.makedirs(path, exist_ok=True)
+
         settings = Settings()
         settings.is_persistent = True
         settings.anonymized_telemetry = False
-        path = os.path.join(".", "vectors", db_name)
-        os.makedirs(path, exist_ok=True)
         settings.persist_directory = path
+
         self.client = Client(settings=settings)
         self.coll_cache = {}  # instance-local cache
         self.logger.info("initialized %s vector database", db_name)
         return
 
-    def _get_qualified_name(self, coll_name: str) -> str:
-        return f"{coll_name}_{self.name}"
+    def _unique_coll_name(self, coll_name: str)-> str:
+        return coll_name + f"_{self.name}"
+
 
     def _get_collection(self, coll_name: str)-> Collection:
-        qualified_name = self._get_qualified_name(coll_name)
+        unique_name = self._unique_coll_name(coll_name)
+
         collection: Collection
-        if qualified_name not in self.coll_cache:
-            collection = self.client.get_or_create_collection(name=qualified_name)
-            self.coll_cache[qualified_name] = collection
+        if not unique_name in self.coll_cache:
+            collection = self.client.get_or_create_collection(name=unique_name)
+            self.coll_cache[unique_name] = collection
         else:
-            collection = self.coll_cache[qualified_name]
+            collection = self.coll_cache[unique_name]
         return collection
 
 
@@ -134,12 +139,12 @@ class VdbChroma(VectorDataBase):
 
 
     def clear(self, coll_name: str)-> None:
-        qualified_name = self._get_qualified_name(coll_name)
+        unique_name = self._unique_coll_name(coll_name)
         try:
-            self.client.delete_collection(qualified_name)
+            self.client.delete_collection(unique_name)
         except NotFoundError:
             pass
-        self.coll_cache[qualified_name] = self.client.get_or_create_collection(name=qualified_name)
+        self.coll_cache[unique_name] = self.client.get_or_create_collection(name=unique_name)
         return
     
 

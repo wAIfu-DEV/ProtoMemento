@@ -26,11 +26,11 @@ class UserDatabase:
 
 
     def _is_initialized(self)-> bool:
-        return os.path.exists("../users")
+        return os.path.exists("./users")
 
 
     def _initialize(self)-> None:
-        os.mkdir("../users")
+        os.mkdir("./users")
         return
 
 
@@ -41,17 +41,17 @@ class UserDatabase:
     def _get_path(self, coll_name: str, user: str)-> str:
         sanitized_coll: str = self._sanitize_name(coll_name)
         sanitized_user: str = self._sanitize_name(user)
-        return os.path.join("..", "users", sanitized_coll, sanitized_user + ".json")
+        return os.path.join(".", "users", sanitized_coll, sanitized_user + ".json")
 
 
     def _is_coll_exist(self, coll_name: str)-> bool:
         sanitized_coll: str = self._sanitize_name(coll_name)
-        return os.path.exists(os.path.join("..", "users", sanitized_coll))
+        return os.path.exists(os.path.join(".", "users", sanitized_coll))
     
     
     def _init_coll(self, coll_name: str)-> None:
         sanitized_coll: str = self._sanitize_name(coll_name)
-        path = os.path.join("..", "users", sanitized_coll)
+        path = os.path.join(".", "users", sanitized_coll)
         os.makedirs(path)
 
 

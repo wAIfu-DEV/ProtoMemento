@@ -21,7 +21,8 @@ async def periodic_decay(decay_vdb: DecayingVdb):
 
 async def main():
     logging.basicConfig(
-        format='[%(asctime)s][%(filename)s:%(lineno)s][%(name)s.%(funcName)s] %(message)s',
+        format="[%(asctime)s][%(name)s.%(funcName)s] %(message)s",
+        datefmt="%m/%d %H:%M:%S",
         level=logging.INFO
     )
     logger = logging.getLogger("global")
