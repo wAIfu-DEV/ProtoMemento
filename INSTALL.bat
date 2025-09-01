@@ -12,4 +12,9 @@ ECHO Installing deps...
 CALL %CWD%/venv/Scripts/pip.exe install -r requirements.txt
 ECHO Installed deps.
 
+IF NOT EXIST "%CWD%/.env" (
+    ECHO Creating .env file
+    ECHO OPENAI_API_KEY= > %CWD%/.env
+)
+
 PAUSE

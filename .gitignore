@@ -2,5 +2,5 @@ vectors
 venv
 decay_meta
 users
-.env
+.env*
 "decay_meta/"
