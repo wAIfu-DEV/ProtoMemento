@@ -48,7 +48,7 @@ class EvictingVdb(VectorDataBase):
 
 
     def clear(self, coll_name: str)-> None:
-        self.wrapped.remove(coll_name)
+        self.wrapped.clear(coll_name)
         return
 
 
