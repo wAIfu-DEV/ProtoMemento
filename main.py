@@ -45,6 +45,7 @@ async def main():
     short_evicting = EvictingVdb(
         wrapped_vdb=short_vdb,
         dest_vdb=long_vdb,
+        progressive_eviction=conf.short_vdb.progressive_eviction,
         max_size_before_evict=conf.short_vdb.max_size_before_evict,
     )
     long_decaying = DecayingVdb(wrapped_vdb=long_vdb)

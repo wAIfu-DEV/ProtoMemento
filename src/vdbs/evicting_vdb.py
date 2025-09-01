@@ -5,30 +5,33 @@ from src.vdbs.vector_database import VectorDataBase
 class EvictingVdb(VectorDataBase):
     wrapped: VectorDataBase
     dest: VectorDataBase
+    prog_evict: bool
     max_size: int
     logger: logging.Logger
 
 
-    def __init__(self, wrapped_vdb: VectorDataBase, dest_vdb: VectorDataBase, max_size_before_evict = -1)-> None:
+    def __init__(self, wrapped_vdb: VectorDataBase, dest_vdb: VectorDataBase, progressive_eviction = True, max_size_before_evict = -1)-> None:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.wrapped = wrapped_vdb
         self.dest = dest_vdb
+        self.prog_evict = progressive_eviction
         self.max_size = max_size_before_evict
         return
 
 
-    def _evict_oldest(self, coll_name: str)-> None:
+    def _evict_oldest(self, coll_name: str)-> bool:
         mems = self.wrapped.pop_oldest(coll_name, n=1)
         if len(mems) > 0:
             self.dest.store(coll_name, mems[0])
+        return len(mems) > 0
 
 
     def _evict_overflow(self, coll_name: str)-> None:
-        if self.max_size < 0:
-            return
-        
-        while self.wrapped.count(coll_name) > self.max_size:
-            self._evict_oldest(coll_name)
+        if self.prog_evict and self.max_size > 0:
+            while self.wrapped.count(coll_name) > self.max_size:
+                success = self._evict_oldest(coll_name)
+                if not success:
+                    break
         return
 
 
@@ -61,13 +64,9 @@ class EvictingVdb(VectorDataBase):
 
 
     def evict_all(self, coll_name: str) -> None:
-        while True:
-            before = self.wrapped.count(coll_name)
-            if before == 0:
-                break
-            self._evict_oldest(coll_name)
-            after = self.wrapped.count(coll_name)
-            if after >= before:
+        while self.wrapped.count(coll_name):
+            success = self._evict_oldest(coll_name)
+            if not success:
                 break
     
     def get_collection_names(self) -> list[str]:
