@@ -95,7 +95,7 @@ class DecayingVdb(VectorDataBase):
             total = self.wrapped.count(coll_name)
             if total == 0:
                 self.logger.info("collection empty – nothing to decay.")
-                self._save_last_run(coll_name, now)
+                self._save_last_run(now)
                 continue
 
             processed = 0
