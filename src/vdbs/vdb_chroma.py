@@ -144,6 +144,10 @@ class VdbChroma(VectorDataBase):
         return self._get_collection(coll_name).count()
     
     
-    def get_collection_names(self)-> list[str]:
-        colls = self.client.list_collections()
-        return [x.name for x in colls]
+    def get_collection_names(self) -> list[str]:
+        suffix = f"_{self.name}"
+        all_cols = self.client.list_collections()
+        suffix_cols = [c.name for c in all_cols if c.name.endswith(suffix)]
+        logical_names = [name[:-len(suffix)] for name in suffix_cols]
+        return logical_names
+
