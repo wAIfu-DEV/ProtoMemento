@@ -10,7 +10,7 @@ from src.messages import OpenLlmMsg
 
 class RememberEntry(BaseModel):
     text: str = Field(..., max_length=80)
-    user: Optional[str] = Field(..., max_length=25)
+    user: Optional[str] = Field(None, max_length=25)
 
 class EmotionState(BaseModel):
     neutral: float = Field(..., ge=0.0, le=1.0, multiple_of=0.1)

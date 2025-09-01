@@ -1,17 +1,17 @@
 import logging
 import os
 from chromadb import Client, ClientAPI, Collection, Settings
+from chromadb.errors import NotFoundError
 
 from src.vdbs.vector_database import VectorDataBase
 from src.memory import Memory, QueriedMemory
 
 class VdbChroma(VectorDataBase):
     client: ClientAPI = None
-    coll_cache: dict[str, Collection] = {}
+    coll_cache: dict[str, Collection]
     size_limit: int = -1
     name: str
     logger: logging.Logger
-
 
     def __init__(self, db_name: str, size_limit: int = -1)-> None:
         self.logger = logging.getLogger(f"{self.__class__.__name__}({db_name})")
@@ -27,9 +27,9 @@ class VdbChroma(VectorDataBase):
         settings.persist_directory = path
 
         self.client = Client(settings=settings)
+        self.coll_cache = {}  # instance-local cache
         self.logger.info("initialized %s vector database", db_name)
         return
-
 
     def _unique_coll_name(self, coll_name: str)-> str:
         return coll_name + f"_{self.name}"
@@ -64,14 +64,13 @@ class VdbChroma(VectorDataBase):
 
 
     def store(self, coll_name: str, memory: Memory)-> None:
-        metadata = {
-            "t": memory.time,
-            "u": memory.user,
-        }
+        metadata = {"t": memory.time}
 
-        if not memory.score is None:
+        if memory.user:                    # only add when non-empty truthy
+            metadata["u"] = memory.user
+        if memory.score is not None:
             metadata["s"] = memory.score
-        if not memory.lifetime is None:
+        if memory.lifetime is not None:
             metadata["l"] = memory.lifetime
 
         self._get_collection(coll_name).add(
@@ -82,7 +81,6 @@ class VdbChroma(VectorDataBase):
 
         if self.size_limit >= 0:
             self._restrict_size(coll_name)
-        return
 
 
     def remove(self, coll_name: str, memory_id: str)-> None:
@@ -142,8 +140,11 @@ class VdbChroma(VectorDataBase):
 
     def clear(self, coll_name: str)-> None:
         unique_name = self._unique_coll_name(coll_name)
-        self.client.delete_collection(unique_name)
-        self.coll_cache[unique_name] = self.client.create_collection(unique_name)
+        try:
+            self.client.delete_collection(unique_name)
+        except NotFoundError:
+            pass
+        self.coll_cache[unique_name] = self.client.get_or_create_collection(name=unique_name)
         return
     
 
@@ -151,6 +152,10 @@ class VdbChroma(VectorDataBase):
         return self._get_collection(coll_name).count()
     
     
-    def get_collection_names(self)-> list[str]:
-        colls = self.client.list_collections()
-        return [x.name for x in colls]
+    def get_collection_names(self) -> list[str]:
+        suffix = f"_{self.name}"
+        all_cols = self.client.list_collections()
+        suffix_cols = [c.name for c in all_cols if c.name.endswith(suffix)]
+        logical_names = [name[:-len(suffix)] for name in suffix_cols]
+        return logical_names
+
