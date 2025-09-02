@@ -5,6 +5,7 @@ import time
 import traceback
 import uuid
 import logging
+import asyncio
 from typing import Callable, Coroutine, Literal
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from websockets.asyncio.server import Server, ServerConnection
 from websockets import ConnectionClosed
 
 from src.config import Config
+from src.compressor import Compressor
 from src.memory import Memory
 from src.ai import AI
 from src.messages import MessageTypes, MsgClose, MsgEvict, MsgQuery, MsgStore, MsgProcess
@@ -59,6 +61,12 @@ class WssHandler:
             api_key=env["OPENAI_API_KEY"],
             config=config
         )
+        self.compressor = Compressor(ai=self.ai, long_vdb=self.dbs.long_term, config=self.config)
+
+        self._compress_q: asyncio.Queue[tuple[str, list[Memory]]] = asyncio.Queue(maxsize=8)
+        self._compress_worker_task = asyncio.create_task(self._compressor_worker())
+
+        self.dbs.short_term.set_on_evict(self._on_evict_chunk)
         self.logger.info("initialized wss handler")
         return
 
@@ -152,6 +160,8 @@ class WssHandler:
 
 
     async def _on_query(self, conn: ServerConnection, obj: dict)-> None:
+        if obj.get("user", "") is None:
+            obj["user"] = ""
         message = MsgQuery.model_validate(obj, by_alias=True)
 
         short_query = []
@@ -270,6 +280,45 @@ class WssHandler:
         self.dbs.short_term.evict_all(message.ai_name)
         self.logger.info("evicted messages from collection: %s", message.ai_name)
         return
+        
+    def _on_evict_chunk(self, coll_name: str, mems: list[Memory]) -> None:
+        self.logger.info("on_evict_chunk: coll=%s batch=%d", coll_name, len(mems))
+        # Try to enqueue quickly; if queue is full, fall back to fire-and-forget off-thread task.
+        try:
+            self._compress_q.put_nowait((coll_name, mems))
+            self.logger.info("on_evict_chunk: queued for async compression (size=%d)", self._compress_q.qsize())
+        except asyncio.QueueFull:
+            self.logger.warning("compress queue full; running this chunk off-thread immediately")
+            asyncio.create_task(asyncio.to_thread(self.compressor.compress_batch, coll_name, mems))
+        # return immediately – do NOT block the websocket loop.
+        
+    async def _compressor_worker(self) -> None:
+        self.logger.info("compressor worker: started")
+        try:
+            while True:
+                coll_name, mems = await self._compress_q.get()
+                try:
+                    if not self.config.compression.enabled:
+                        # pass-through: store to LTM without compression
+                        for m in mems:
+                            self.dbs.long_term.store(coll_name, m)
+                        self.logger.info("compressor worker: pass-through %d mems -> LTM (%s)", len(mems), coll_name)
+                    else:
+                        size = max(1, int(self.config.compression.batch_size))
+                        # run blocking OpenAI calls off the event loop
+                        for i in range(0, len(mems), size):
+                            batch = mems[i:i+size]
+                            await asyncio.to_thread(self.compressor.compress_batch, coll_name, batch)
+                        self.logger.info("compressor worker: compressed %d mems (%s)", len(mems), coll_name)
+                except Exception as e:
+                    self.logger.exception("compressor worker: error while processing '%s': %s", coll_name, e)
+                finally:
+                    self._compress_q.task_done()
+        except asyncio.CancelledError:
+            self.logger.info("compressor worker: cancelled")
+            raise
+
+
 
 
     async def _on_close(self, conn: ServerConnection, obj: dict)-> None:
@@ -282,3 +331,18 @@ class WssHandler:
     async def _on_unhandled(self, conn: ServerConnection, obj: dict)-> None:
         self.logger.info("received unhandled message.")
         raise ValueError("received message with unhandled message type: " + json.dumps(obj))
+
+
+    async def _compressor_worker(self) -> None:
+        self.logger.info("compressor worker: started")
+        while True:
+            coll_name, mems = await self._compress_q.get()
+            try:
+                size = self.config.compression.batch_size
+                for i in range(0, len(mems), size):
+                    sub = mems[i:i+size]
+                    await self.compressor.compress_batch_async(coll_name, sub)
+            except Exception as e:
+                self.logger.exception("compression failed during eviction for '%s': %s", coll_name, e)
+            finally:
+                self._compress_q.task_done()

@@ -51,7 +51,10 @@ async def main():
         dest_vdb=long_vdb,
         progressive_eviction=conf.short_vdb.progressive_eviction,
         max_size_before_evict=conf.short_vdb.max_size_before_evict,
+        evict_fraction=conf.compression.batch_fraction_on_breach,
+        evict_min_batch=conf.compression.min_batch_on_breach,
     )
+
     long_decaying = DecayingVdb(wrapped_vdb=long_vdb)
 
     user_db = UserDatabase(size_limit_per_user=conf.user_db.max_size_per_user)
