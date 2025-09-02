@@ -32,7 +32,7 @@ class ProcessResult(BaseModel):
 
 class AI:
     config: Config
-    client: openai.Client
+    client: openai.AsyncClient
     model_name: str
     prompt_cache: dict[str, str] = {}
     logger: logging.Logger
@@ -40,7 +40,7 @@ class AI:
 
     def __init__(self, base_url: str | None = None, api_key: str | None = None, model_name: str = "", config: Config = None):
         self.config = config
-        self.client = openai.Client(
+        self.client = openai.AsyncClient(
             api_key=api_key,
             base_url=base_url,
         )
@@ -79,7 +79,7 @@ class AI:
             "content": f"{ process_prompt }{ msg_str.strip() }",
         }
 
-        completion = self.client.beta.chat.completions.parse(
+        completion = await self.client.beta.chat.completions.parse(
             model=self.model_name,
             messages=[*context, prompt_msg],
             temperature=self.config.openllm.temp,

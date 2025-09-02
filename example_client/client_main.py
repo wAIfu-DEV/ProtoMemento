@@ -1,11 +1,12 @@
 import asyncio
 import json
-import sys
 import time
 import uuid
 
 from websockets.asyncio.client import connect, ClientConnection
 
+
+repeat_obj = {}
 
 async def recv_routine(ws: ClientConnection):
     while True:
@@ -14,7 +15,7 @@ async def recv_routine(ws: ClientConnection):
             async with asyncio.timeout(0.5):
                 data = await ws.recv(decode=True)
                 print("Received: ", json.dumps(json.loads(data), indent=4))
-                print("\nmsg type (store, query, evict): ", end="", flush=True)
+                print("\nmsg type (store, query, evict, process, close): ", end="", flush=True)
         except:
             continue
 
@@ -24,7 +25,16 @@ async def async_input(text: str = "") -> str:
     return await asyncio.to_thread(input, text)
 
 
+async def send(ws: ClientConnection, obj: dict)-> None:
+    global repeat_obj
+    repeat_obj = obj
+    data = json.dumps(obj)
+    await ws.send(data, text=True)
+
+
 async def main():
+    global repeat_obj
+
     async with connect(uri="ws://127.0.0.1:4286") as ws:
         
         asyncio.create_task(recv_routine(ws))
@@ -32,7 +42,7 @@ async def main():
         while True:
             await asyncio.sleep(0)
 
-            inp = await async_input("msg type (store, query, evict, process, close): ")
+            inp = await async_input("msg type (store, query, evict, process, close, repeat): ")
             match inp:
                 case "store":
                     content = await async_input("content: ")
@@ -45,7 +55,7 @@ async def main():
                     ai_name = await async_input("ai name: ")
                     to = await async_input("store to (stm, ltm, users): ")
 
-                    data = json.dumps({
+                    await send(ws, {
                         "uid": str(uuid.uuid4()),
                         "type": "store",
                         "ai_name": ai_name,
@@ -61,7 +71,6 @@ async def main():
                         ],
                         "to": [to],
                     })
-                    await ws.send(data, text=True)
                 case "query":
                     query = await async_input("query: ")
 
@@ -73,7 +82,7 @@ async def main():
                     from_ = await async_input("query from (stm, ltm, users): ")
                     n = int(await async_input("n: "))
 
-                    data = json.dumps({
+                    await send(ws, {
                         "uid": str(uuid.uuid4()),
                         "type": "query",
                         "ai_name": ai_name,
@@ -82,37 +91,41 @@ async def main():
                         "from": [from_],
                         "n": [n],
                     })
-                    await ws.send(data, text=True)
                 case "evict":
                     ai_name = await async_input("ai name: ")
 
-                    data = json.dumps({
+                    await send(ws, {
                         "uid": str(uuid.uuid4()),
                         "type": "evict",
                         "ai_name": ai_name,
                     })
-                    await ws.send(data, text=True)
                 case "process":
                     ai_name = await async_input("ai name: ")
                     context = None
                     with open("./example_client/conversation.json", "r", encoding="utf-8") as f:
                         messages = json.load(f)
                     
-                    data = json.dumps({
+                    await send(ws, {
                         "uid": str(uuid.uuid4()),
                         "type": "process",
                         "ai_name": ai_name,
                         "context": context,
                         "messages": messages["convo"]
                     })
-                    await ws.send(data, text=True)
                 case "close":
-                    data = json.dumps({
+                    await send(ws, {
                         "uid": str(uuid.uuid4()),
                         "type": "close",
                     })
-                    await ws.send(data, text=True)
                     exit(0)
+                case "repeat":
+                    repeat_obj["uid"] = str(uuid.uuid4())
+
+                    if "memories" in repeat_obj:
+                        for m in repeat_obj["memories"]:
+                            m["id"] = str(uuid.uuid4())
+
+                    await send(ws, repeat_obj)
                     
 
 

@@ -49,6 +49,8 @@ class Config(BaseModel):
 
 
 def parse_config()-> Config:
+    conf: Config
+    
     with open("./config.json", "r", encoding="utf-8") as f:
         try:
             obj = json.load(f)

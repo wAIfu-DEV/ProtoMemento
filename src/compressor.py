@@ -60,6 +60,7 @@ class Compressor:
             "Group related lines together into one memory where appropriate. "
             "For each output memory, populate source_ids with the IDs of the short-term memories you actually used."
         )
+        
         bullets = []
         for m in items:
             meta = []
@@ -70,6 +71,7 @@ class Compressor:
             meta_str = f"[{', '.join(meta)}] " if meta else ""
             # include the id so the model can reference it
             bullets.append(f"- (id={m.id}) {meta_str}{m.content}")
+        
         body = "\n".join(bullets) if bullets else "- (none)"
         prompt = {"role": "user", "content": header + "\n\n[INPUT]\n" + body}
         self.log.debug("compress_batch prompt >>>\n%s", prompt["content"])
@@ -98,32 +100,37 @@ class Compressor:
         return msgs
 
 
+    def _filter_score(self, score: float | None, floor_val: float)-> bool:
+        return (score if score is not None else 0.0) >= floor_val
+    
+
     async def compress_batch_async(self, ai_name: str, stm_batch: List[Memory]) -> None:
         self.log.info("compress_batch_async start: coll=%s size=%d", ai_name, len(stm_batch))
 
         floor_val = self.conf.compression.score_floor_for_ltm
-        filtered = [m for m in stm_batch if (m.score if m.score is not None else 0.0) >= floor_val]
+        filtered = [m for m in stm_batch if self._filter_score(m.score, floor_val)]
+
         self.log.info("compress_batch_async filter: floor=%.2f -> kept=%d dropped=%d",
                       floor_val, len(filtered), len(stm_batch)-len(filtered))
-        if not filtered:
+
+        if len(filtered) == 0:
             self.log.info("compress_batch_async abort: nothing above floor.")
             return
 
         by_id = {m.id: m for m in filtered}
         comp_msg = self._build_batch_prompt(ai_name, filtered)
 
-        # LLM call off the loop
-        comp = await asyncio.to_thread(
-            self.ai.client.beta.chat.completions.parse,
+        comp = await self.ai.client.beta.chat.completions.parse(
             model=self.ai.model_name,
             messages=[comp_msg],
             temperature=self.conf.openllm.temp,
-            max_completion_tokens=min(1000, self.conf.openllm.max_completion_tokens),
+            max_completion_tokens=self.conf.openllm.max_completion_tokens,
             response_format=_CompressOut,
         )
-        out: _CompressOut = comp.choices[0].message.parsed
-        self.log.info("compress_batch_async LLM parsed <<< %s", out.model_dump_json(indent=2))
-        if not out or not out.memories:
+        out: _CompressOut | None = comp.choices[0].message.parsed
+        self.log.info("compress_batch_async LLM parsed <<< %s", out.model_dump_json(indent=4))
+
+        if out is None or len(out.memories) == 0:
             self.log.info("compress_batch_async abort: LLM returned no memories.")
             return
 
@@ -131,8 +138,10 @@ class Compressor:
 
         for idx, item in enumerate(out.memories, start=1):
             new_text = item.text.strip()
+
             contributing = [by_id[sid] for sid in (item.source_ids or []) if sid in by_id]
             score = self._score_mean(contributing) if contributing else fallback_score
+
             lifetime = self._lifetime_from_score(score)
             self.log.info("merge step: %d/%d (sources=%d score=%.2f life=%d)",
                           idx, len(out.memories), len(contributing), score, lifetime)
@@ -147,16 +156,17 @@ class Compressor:
 
             merge_msgs = self._build_merge_prompt(ai_name, new_text, existing, self.conf.compression.prefer_new)
 
-            # Second LLM call off the loop
-            merged = (await asyncio.to_thread(
-                self.ai.client.beta.chat.completions.parse,
+            # TODO: better error handling, retry strategy
+
+            merged = (await self.ai.client.beta.chat.completions.parse(
                 model=self.ai.model_name,
                 messages=merge_msgs,
                 temperature=self.conf.openllm.temp,
-                max_completion_tokens=min(1000, self.conf.openllm.max_completion_tokens),
+                max_completion_tokens=self.conf.openllm.max_completion_tokens,
                 response_format=_MergeOut,
             )).choices[0].message.parsed
-            self.log.info("merge LLM parsed <<< %s", merged.model_dump_json(indent=2))
+
+            self.log.info("merge LLM parsed <<< %s", merged.model_dump_json(indent=4))
 
             for mem_id in (merged.delete_ids or []):
                 try:

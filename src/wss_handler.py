@@ -83,8 +83,10 @@ class WssHandler:
             await conn.send(json_data, text=True)
             self.logger.info("sent: %s", json_data)
             self.consecutive_err_count["send"] = 0
+
         except ConnectionClosed as e:
             raise e
+        
         except Exception as e:
             # should not be able to be thrown, would trigger inifine loop
             # since we are using _send_error in the exception handling
@@ -291,34 +293,6 @@ class WssHandler:
             self.logger.warning("compress queue full; running this chunk off-thread immediately")
             asyncio.create_task(asyncio.to_thread(self.compressor.compress_batch, coll_name, mems))
         # return immediately – do NOT block the websocket loop.
-        
-    async def _compressor_worker(self) -> None:
-        self.logger.info("compressor worker: started")
-        try:
-            while True:
-                coll_name, mems = await self._compress_q.get()
-                try:
-                    if not self.config.compression.enabled:
-                        # pass-through: store to LTM without compression
-                        for m in mems:
-                            self.dbs.long_term.store(coll_name, m)
-                        self.logger.info("compressor worker: pass-through %d mems -> LTM (%s)", len(mems), coll_name)
-                    else:
-                        size = max(1, int(self.config.compression.batch_size))
-                        # run blocking OpenAI calls off the event loop
-                        for i in range(0, len(mems), size):
-                            batch = mems[i:i+size]
-                            await asyncio.to_thread(self.compressor.compress_batch, coll_name, batch)
-                        self.logger.info("compressor worker: compressed %d mems (%s)", len(mems), coll_name)
-                except Exception as e:
-                    self.logger.exception("compressor worker: error while processing '%s': %s", coll_name, e)
-                finally:
-                    self._compress_q.task_done()
-        except asyncio.CancelledError:
-            self.logger.info("compressor worker: cancelled")
-            raise
-
-
 
 
     async def _on_close(self, conn: ServerConnection, obj: dict)-> None:

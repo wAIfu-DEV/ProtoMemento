@@ -1,5 +1,3 @@
-- implement score/lifetime with vector db
-- implement decay system
+- better error handling for openai calls, risk of data loss
 - change relative paths to Path(__file__).parent
 - switch user database from JSON to CSV
-- gitignore decay_meta
