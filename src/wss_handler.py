@@ -127,7 +127,7 @@ class WssHandler:
                 continue
 
             if not "type" in obj:
-                await self._send_error(conn, TypeError("missing field \"type\" in message from client"))
+                await self._send_error(conn, ValueError("missing field \"type\" in message from client"))
                 continue
 
             msg_type = obj.get("type", "unhandled")
@@ -281,4 +281,4 @@ class WssHandler:
 
     async def _on_unhandled(self, conn: ServerConnection, obj: dict)-> None:
         self.logger.info("received unhandled message.")
-        raise TypeError("Received message with unhandled message type: " + json.dumps(obj))
+        raise ValueError("received message with unhandled message type: " + json.dumps(obj))
