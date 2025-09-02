@@ -29,7 +29,8 @@ class WssHandler:
     server: Server = None
     close_server: asyncio.Future
 
-    handlers: dict[MessageTypes, Callable[[ServerConnection, dict], Coroutine]] = {}
+    handlers: dict[MessageTypes, Callable[[ServerConnection, dict], Coroutine]]
+    consecutive_err_count: dict[str, int]
 
 
     def __init__(self, database_bundle: DbBundle, config: Config, env: dict)-> None:
@@ -47,6 +48,9 @@ class WssHandler:
             "close": self._on_close,
 
             "unhandled": self._on_unhandled,
+        }
+        self.consecutive_err_count = {
+            "send": 0
         }
 
         self.ai = AI(
@@ -66,10 +70,23 @@ class WssHandler:
 
 
     async def _send(self, conn: ServerConnection, data: dict)-> None:
-        json_data = json.dumps(data)
-        await conn.send(json_data, text=True)
-        self.logger.info("sent: %s", json_data)
+        try:
+            json_data = json.dumps(data)
+            await conn.send(json_data, text=True)
+            self.logger.info("sent: %s", json_data)
+            self.consecutive_err_count["send"] = 0
+        except ConnectionClosed as e:
+            raise e
+        except Exception as e:
+            # should not be able to be thrown, would trigger inifine loop
+            # since we are using _send_error in the exception handling
+            self.logger.error("error during sending: %s\n%s", str(e), traceback.format_exc())
+            self.consecutive_err_count["send"] = self.consecutive_err_count.get("send", 0) + 1
 
+            if self.consecutive_err_count.get("send", 0) > 5:
+                self.logger.error("could not recover after too many errors, closing server.")
+                self.close_server.set_result(None)
+    
 
     async def _send_error(self, conn: ServerConnection, e: Exception, id: str | None = None)-> None:
         err = str(e)
@@ -100,19 +117,23 @@ class WssHandler:
             self.logger.info("received message: %s", data)
         
             try:
-                obj: dict = json.loads(data)
+                obj = json.loads(data)
             except Exception as e:
                 await self._send_error(conn, e)
                 continue
 
+            if not isinstance(obj, dict):
+                await self._send_error(conn, TypeError("json value sent from client is not a valid object with the shape {\"key\": value, ...}"))
+                continue
+
             if not "type" in obj:
-                await self._send_error(conn, TypeError('missing field "type" in message from client'))
+                await self._send_error(conn, TypeError("missing field \"type\" in message from client"))
                 continue
 
             msg_type = obj.get("type", "unhandled")
 
             if not isinstance(msg_type, str):
-                await self._send_error(conn, TypeError('invalid type for value of field "type" in message from client'))
+                await self._send_error(conn, TypeError("invalid type for value of field \"type\" in message from client"))
                 continue
 
             msg_handler = self.handlers.get(msg_type, self._on_unhandled)

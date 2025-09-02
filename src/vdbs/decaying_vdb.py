@@ -144,6 +144,6 @@ class DecayingVdb(VectorDataBase):
                 self.logger.info("processed %d/%d memories for collection '%s'.", processed, total, coll_name)
 
         self._save_last_run(now)
-        self.logger.info("decay completed for all collection - %d day(s) applied.", elapsed_days)
+        self.logger.info("decay completed for all collections - %d day(s) applied.", elapsed_days)
         return
         

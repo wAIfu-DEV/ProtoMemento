@@ -31,7 +31,7 @@ async def main():
         while True:
             await asyncio.sleep(0)
 
-            inp = await async_input("msg type (store, query, evict): ")
+            inp = await async_input("msg type (store, query, evict, process, close): ")
             match inp:
                 case "store":
                     content = await async_input("content: ")
@@ -105,6 +105,13 @@ async def main():
                         "messages": messages["convo"]
                     })
                     await ws.send(data, text=True)
+                case "close":
+                    data = json.dumps({
+                        "uid": str(uuid.uuid4()),
+                        "type": "close",
+                    })
+                    await ws.send(data, text=True)
+                    exit(0)
                     
 
 
