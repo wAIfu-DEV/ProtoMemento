@@ -14,9 +14,13 @@ from src.wss_handler import WssHandler
 
 
 async def periodic_decay(decay_vdb: DecayingVdb):
-    while True:
-        decay_vdb.decay_all()
-        await asyncio.sleep(60 * 60 * 12) # every 6 hours, will skip if date diff < 1
+    try:
+        while True:
+            decay_vdb.decay_all()
+            await asyncio.sleep(60 * 60 * 12) # every 6 hours, will skip if date diff < 1
+        
+    except asyncio.CancelledError:
+        return
 
 
 async def main():
@@ -31,7 +35,7 @@ async def main():
     env = parse_env()
     conf = parse_config()
 
-    #generate_schemas() # Generate schemas for inbound Ws messages
+    #generate_schemas() # generate schemas for inbound Ws messages
 
     logger.info("initializing databases...")
     short_size = conf.short_vdb.max_size_before_evict + 10\
@@ -55,12 +59,13 @@ async def main():
     bundle = DbBundle(short=short_evicting, long=long_decaying, users=user_db)
 
     # decay routine
-    asyncio.create_task(periodic_decay(long_decaying))
+    decay_task = asyncio.create_task(periodic_decay(long_decaying))
 
     wss_handler = WssHandler(database_bundle=bundle, config=conf, env=env)
     async with serve(wss_handler.handle, host=conf.wss.host, port=conf.wss.port) as wss:
-        wss_handler.server = wss
-        await asyncio.Future()
+        await wss_handler.bind_and_wait(server=wss)
+        # server is being closed
+        decay_task.cancel() # may keep program running if not cancelled
     return
 
 

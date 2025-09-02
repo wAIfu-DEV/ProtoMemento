@@ -1,3 +1,4 @@
+import asyncio
 import json
 from math import floor
 import time
@@ -13,7 +14,7 @@ from websockets import ConnectionClosed
 from src.config import Config
 from src.memory import Memory
 from src.ai import AI
-from src.messages import MessageTypes, MsgEvict, MsgQuery, MsgStore, MsgProcess
+from src.messages import MessageTypes, MsgClose, MsgEvict, MsgQuery, MsgStore, MsgProcess
 from src.db_bundle import DbBundle
 
 
@@ -22,11 +23,13 @@ class WssHandler:
     env: dict
 
     dbs: DbBundle
-    server: Server = None
     ai: AI
+    logger: logging.Logger
+
+    server: Server = None
+    close_server: asyncio.Future
 
     handlers: dict[MessageTypes, Callable[[ServerConnection, dict], Coroutine]] = {}
-    logger: logging.Logger
 
 
     def __init__(self, database_bundle: DbBundle, config: Config, env: dict)-> None:
@@ -41,6 +44,7 @@ class WssHandler:
             "store": self._on_store,
             "process": self._on_process,
             "evict": self._on_evict,
+            "close": self._on_close,
 
             "unhandled": self._on_unhandled,
         }
@@ -53,6 +57,12 @@ class WssHandler:
         )
         self.logger.info("initialized wss handler")
         return
+
+
+    async def bind_and_wait(self, server: Server)-> None:
+        self.server = server
+        self.close_server = asyncio.Future()
+        await self.close_server
 
 
     async def _send(self, conn: ServerConnection, data: dict)-> None:
@@ -238,6 +248,13 @@ class WssHandler:
         message = MsgEvict.model_validate(obj)
         self.dbs.short_term.evict_all(message.ai_name)
         self.logger.info("evicted messages from collection: %s", message.ai_name)
+        return
+
+
+    async def _on_close(self, conn: ServerConnection, obj: dict)-> None:
+        _ = MsgClose.model_validate(obj)
+        self.logger.info("received close message.")
+        self.close_server.set_result(None)
         return
 
 
