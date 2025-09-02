@@ -19,5 +19,14 @@
     },
     "user_db": {
         "max_size_per_user": 25
+    },
+    "compression": {
+        "enabled": true,
+        "score_floor_for_ltm": 0.3,
+        "batch_size": 32,
+        "similar_top_k": 5,
+        "prefer_new": true,
+        "batch_fraction_on_breach": 1.0,
+        "min_batch_on_breach": 1
     }
 }

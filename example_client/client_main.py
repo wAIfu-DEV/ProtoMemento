@@ -14,6 +14,7 @@ async def recv_routine(ws: ClientConnection):
             async with asyncio.timeout(0.5):
                 data = await ws.recv(decode=True)
                 print("Received: ", json.dumps(json.loads(data), indent=4))
+                print("\nmsg type (store, query, evict): ", end="", flush=True)
         except:
             continue
 

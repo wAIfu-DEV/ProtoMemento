@@ -27,6 +27,16 @@ class LongVdbConfig(BaseModel):
 
 class UserDbConfig(BaseModel):
     max_size_per_user: int = Field(25)
+    
+    
+class CompressionConfig(BaseModel):
+    enabled: bool = Field(True)
+    score_floor_for_ltm: float = Field(0.3)        # drop STM mems with score below this before LTM
+    batch_size: int = Field(32)                    # how many STM mems to compress at once
+    similar_top_k: int = Field(5)                  # how many LTM neighbors to compare/merge against
+    prefer_new: bool = Field(True)                 # contradictory old memories are deleted
+    batch_fraction_on_breach: float = Field(1.0)   # 0.5 = evict half, 1.0 = evict all, 0.0 = overflow-only
+    min_batch_on_breach: int = Field(1)            # minimum items to evict when triggered
 
 
 class Config(BaseModel):
@@ -35,6 +45,7 @@ class Config(BaseModel):
     short_vdb: ShortVdbConfig = Field(ShortVdbConfig())
     long_vdb: LongVdbConfig = Field(LongVdbConfig())
     user_db: UserDbConfig = Field(UserDbConfig())
+    compression: CompressionConfig = Field(CompressionConfig())
 
 
 def parse_config()-> Config:
