@@ -33,6 +33,7 @@ class WssHandler:
 
     handlers: dict[MessageTypes, Callable[[ServerConnection, dict], Coroutine]]
     consecutive_err_count: dict[str, int]
+    recv_time: int = 0
 
 
     def __init__(self, database_bundle: DbBundle, config: Config, env: dict)-> None:
@@ -81,6 +82,7 @@ class WssHandler:
         try:
             json_data = json.dumps(data)
             await conn.send(json_data, text=True)
+            self.logger.info("recv->send latency: %d", int(time.time() * 1_000) - self.recv_time)
             self.logger.info("sent: %s", json_data)
             self.consecutive_err_count["send"] = 0
 
@@ -124,6 +126,7 @@ class WssHandler:
                 self.logger.info("connection closed on recv.")
                 return
 
+            self.recv_time = int(time.time() * 1_000)
             self.logger.info("received message: %s", data)
         
             try:

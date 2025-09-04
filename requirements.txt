@@ -1,4 +1,4 @@
 websockets
-chromadb
+chromadb==0.6.3
 jsonschema
 openai

@@ -1,19 +1,23 @@
 import asyncio
 import json
+import sys
 import time
 import uuid
 
 from websockets.asyncio.client import connect, ClientConnection
 
-
+send_time = 0
 repeat_obj = {}
 
-async def recv_routine(ws: ClientConnection):
+def recv_routine(ws: ClientConnection):
+    asyncio.run(recv_routine_wrapped(ws))
+
+async def recv_routine_wrapped(ws: ClientConnection):
     while True:
-        await asyncio.sleep(0)
         try:
             async with asyncio.timeout(0.5):
                 data = await ws.recv(decode=True)
+                print("client-side latency: ", int(time.time() * 1_000) - send_time, "ms")
                 print("Received: ", json.dumps(json.loads(data), indent=4))
                 print("\nmsg type (store, query, evict, process, close): ", end="", flush=True)
         except:
@@ -26,10 +30,11 @@ async def async_input(text: str = "") -> str:
 
 
 async def send(ws: ClientConnection, obj: dict)-> None:
-    global repeat_obj
+    global repeat_obj, send_time
     repeat_obj = obj
     data = json.dumps(obj)
     await ws.send(data, text=True)
+    send_time = int(time.time() * 1_000)
 
 
 async def main():
@@ -37,11 +42,9 @@ async def main():
 
     async with connect(uri="ws://127.0.0.1:4286") as ws:
         
-        asyncio.create_task(recv_routine(ws))
+        asyncio.create_task(asyncio.to_thread(recv_routine, ws))
         
         while True:
-            await asyncio.sleep(0)
-
             inp = await async_input("msg type (store, query, evict, process, close, repeat): ")
             match inp:
                 case "store":

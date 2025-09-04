@@ -1,10 +1,30 @@
 import logging
 import os
+import time
 from chromadb import Client, ClientAPI, Collection, Settings
 from chromadb.errors import NotFoundError
 
 from src.vdbs.vector_database import VectorDataBase
 from src.memory import Memory, QueriedMemory
+
+
+class ChromaClientSingleton(object):
+  def __new__(cls):
+    if not hasattr(cls, 'instance'):
+        cls.instance = super(ChromaClientSingleton, cls).__new__(cls)
+
+        path = os.path.join(".", "vectors", "chroma")
+        os.makedirs(path, exist_ok=True)
+
+        settings = Settings()
+        settings.is_persistent = True
+        settings.anonymized_telemetry = False
+        settings.persist_directory = path
+
+        cls.client = Client(settings)
+
+    return cls.instance
+
 
 class VdbChroma(VectorDataBase):
     client: ClientAPI = None
@@ -19,15 +39,9 @@ class VdbChroma(VectorDataBase):
         self.size_limit = size_limit
         self.name = db_name
 
-        path = os.path.join(".", "vectors", db_name)
-        os.makedirs(path, exist_ok=True)
+        client_singleton = ChromaClientSingleton()
+        self.client = client_singleton.client
 
-        settings = Settings()
-        settings.is_persistent = True
-        settings.anonymized_telemetry = False
-        settings.persist_directory = path
-
-        self.client = Client(settings=settings)
         self.coll_cache = {}  # instance-local cache
         self.logger.info("initialized %s vector database", db_name)
         return
@@ -91,6 +105,8 @@ class VdbChroma(VectorDataBase):
 
 
     def query(self, coll_name: str, query_str: str, n: int)-> list[QueriedMemory]:
+        start_time = int(time.time() * 1_000)
+
         final: list[QueriedMemory] = []
 
         res = self._get_collection(coll_name).query(
@@ -114,6 +130,8 @@ class VdbChroma(VectorDataBase):
                 distance=res["distances"][0][i],
             )
             final.append(qmem)
+        
+        self.logger.info("query latency: %d", int(time.time() * 1_000) - start_time)
 
         return final
 
