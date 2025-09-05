@@ -55,9 +55,14 @@ class Compressor:
             "[SYSTEM] You are compressing short-term memories into long-term memories for "
             f"{ai_name}. Write in {ai_name}'s first person. Output concise, self-contained "
             "memories that keep the important details and drop trivial/duplicate lines. "
+            "STYLE (MANDATORY):\n"
+            "- Specifics over vibes: name people, quote short key phrases (≤12 words) when clarifying.\n"
+            "- No clichés or abstract descriptors (ban: 'playful dynamic', 'vibrant energy', etc.).\n"
+            "- No speculation. No invented facts.\n"
+            "- Use as much detail as necessary in order to preserve the context and precise details of events that have occured.\n"
             "Do not invent facts.\n\n"
             'Return JSON with field "memories": { "text": string, "source_ids": string[] }[]. '
-            "Group related lines together into one memory where appropriate. "
+            "Group related lines together into one memory where appropriate."
             "For each output memory, populate source_ids with the IDs of the short-term memories you actually used."
         )
         

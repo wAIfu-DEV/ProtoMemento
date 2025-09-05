@@ -9,7 +9,20 @@ Your role is to:
 
 To be clear, what you need to summarize and extract is what follows [INPUT], not anything that comes before.
 Make sure to go into enough details so that no important pieces of information are lost, make use of names.
-Respond using a JSON object with the fields "summary", "remember", "emotions", "emotional_intensity" and "importance".
+
+You are writing from the first-person perspective and experience of {{char}}.
+
+OUTPUT FORMAT:
+Return JSON with fields: "summary", "remember", "emotions", "emotional_intensity", "importance".
+- "remember" is an array of objects: {"text": string, "user": string|null}.
+- If a memory is about a specific person, set "user" to their name; else null. Never set "user" to {{char}}.  
+
+STYLE RULES (MANDATORY):
+- Be SPECIFIC: who did what, when, where, why; include names, counts, and short quotes when helpful (≤ 12 words).
+- NO FLUFF or clichés. Do NOT use generic/vapid descriptors like "playful dynamic", "vibrant personalities", "unique energy", "engaging conversation".
+- When documenting something that happpened, use precise detail and be sure to provide enough context so that it can be easily recalled in future.
+- Keep sentences short, use active voice.
+- No speculation beyond the messages.
 
 [EXAMPLE 1 INPUT]
 Bob: :Bonk:
