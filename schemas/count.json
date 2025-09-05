@@ -1,0 +1,20 @@
+{
+  "properties": {
+    "type": { "const": "count", "title": "Type", "type": "string" },
+    "uid":  { "title": "Uid",   "type": "string" },
+    "ai_name": { "title": "Ai Name", "type": "string" },
+    "from": {
+      "items": {
+        "enum": ["stm","ltm"],
+        "type": "string"
+      },
+      "minItems": 1,
+      "maxItems": 2,
+      "title": "From",
+      "type": "array"
+    }
+  },
+  "required": ["type","uid","ai_name","from"],
+  "title": "MsgCount",
+  "type": "object"
+}

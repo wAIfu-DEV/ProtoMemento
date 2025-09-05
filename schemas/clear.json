@@ -1,0 +1,34 @@
+{
+  "properties": {
+    "type": {
+      "const": "clear",
+      "title": "Type",
+      "type": "string"
+    },
+    "uid": {
+      "title": "Uid",
+      "type": "string"
+    },
+    "ai_name": {
+      "title": "Ai Name",
+      "type": "string"
+    },
+    "target": {
+      "title": "Target",
+      "enum": ["stm", "ltm", "users"],
+      "type": "string"
+    },
+    "user": {
+      "title": "User",
+      "type": ["string", "null"]
+    }
+  },
+  "required": [
+    "type",
+    "uid",
+    "ai_name",
+    "target"
+  ],
+  "title": "MsgClear",
+  "type": "object"
+}

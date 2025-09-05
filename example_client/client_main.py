@@ -19,7 +19,7 @@ async def recv_routine_wrapped(ws: ClientConnection):
                 data = await ws.recv(decode=True)
                 print("client-side latency: ", int(time.time() * 1_000) - send_time, "ms")
                 print("Received: ", json.dumps(json.loads(data), indent=4))
-                print("\nmsg type (store, query, evict, process, close): ", end="", flush=True)
+                print("\nmsg type (store, query, evict, process, count, clear, close): ", end="", flush=True)
         except:
             continue
 
@@ -45,7 +45,7 @@ async def main():
         asyncio.create_task(asyncio.to_thread(recv_routine, ws))
         
         while True:
-            inp = await async_input("msg type (store, query, evict, process, close, repeat): ")
+            inp = await async_input("msg type (store, query, evict, process, count, clear, close, repeat): ")
             match inp:
                 case "store":
                     content = await async_input("content: ")
@@ -115,6 +115,48 @@ async def main():
                         "context": context,
                         "messages": messages["convo"]
                     })
+                case "count":
+                    ai_name = await async_input("ai name: ")
+                    from_ = await async_input("count from (stm, ltm, both): ")
+                    frm = []
+                    if from_.lower() in ("stm", "ltm"):
+                        frm = [from_.lower()]
+                    elif from_.lower() in ("both", "all"):
+                        frm = ["stm", "ltm"]
+                    else:
+                        frm = ["stm", "ltm"]
+                    await send(ws, {
+                        "uid": str(uuid.uuid4()),
+                        "type": "count",
+                        "ai_name": ai_name,
+                        "from": frm,
+                    })
+                case "clear":
+                    ai_name = await async_input("ai name: ")
+                    target = await async_input("clear target (stm, ltm, users): ")
+                    target = target if target in ("stm", "ltm", "users") else "stm"
+
+                    user_val = None
+                    if target == "users":
+                        u = await async_input("user (empty = ALL users): ")
+                        user_val = None if u == "" else u
+
+                    confirm = (await async_input("WARNING: This action permanently deletes data. Type 'confirm' to proceed: ")).strip().lower()
+                    if confirm != "confirm":
+                        print("Clear aborted.")
+                        continue
+
+                    payload = {
+                        "uid": str(uuid.uuid4()),
+                        "type": "clear",
+                        "ai_name": ai_name,
+                        "target": target,
+                    }
+                    if target == "users":
+                        payload["user"] = user_val
+
+                    await send(ws, payload)
+
                 case "close":
                     await send(ws, {
                         "uid": str(uuid.uuid4()),

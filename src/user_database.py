@@ -121,3 +121,25 @@ class UserDatabase:
         
         mems = mems[len(mems) - n:]
         return [Memory.from_dict(x) for x in mems]
+        
+
+    def clear_user(self, coll_name: str, user: str) -> None:
+        """Wipe a single user's mems for a collection."""
+        if not self._is_coll_exist(coll_name):
+            return
+        path = self._get_path(coll_name, user)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write('{"mems": []}')
+
+
+    def clear_all_users(self, coll_name: str) -> None:
+        """Wipe all users mems for a collection."""
+        if not self._is_coll_exist(coll_name):
+            return
+        coll_dir = os.path.join(".", "users", self._sanitize_name(coll_name))
+        for name in os.listdir(coll_dir):
+            p = os.path.join(coll_dir, name)
+            if os.path.isfile(p) and p.endswith(".json"):
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write('{"mems": []}')
