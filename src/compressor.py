@@ -79,25 +79,40 @@ class Compressor:
 
 
     def _build_merge_prompt(self, ai_name: str, new_text: str, existing: List[Memory], prefer_new: bool) -> List[dict]:
-        rule_pref = "Prefer the NEW memory" if prefer_new else "Prefer whichever is more factual/consistent"
+        pref = "Prefer the NEW memory when wording conflicts." if prefer_new else "Prefer the most factual/consistent wording when conflicts are minor."
         sys = (
-            "[SYSTEM] Deduplicate and reconcile long-term memories.\n"
+            "[SYSTEM] Decide whether to merge a NEW long-term memory with existing ones.\n"
             f"Persona: {ai_name}.\n"
-            f"Rules:\n"
-            f"1) {rule_pref}.\n"
-            "2) If an existing memory is essentially the same event/meaning, merge its missing useful details into the new memory, "
-            "   and mark that existing memory for deletion.\n"
-            "3) If an existing memory contradicts the new one, mark it for deletion and do NOT adopt its facts.\n"
-            "4) Keep the final memory concise and self-contained in first person.\n"
-            'Return JSON with fields: new_text (string), delete_ids (string[]).'
+            "\n"
+            "DEFAULT:\n"
+            "  • DO NOT MERGE. Keep memories separate unless they clearly describe the SAME fact/event.\n"
+            "\n"
+            "MERGE ONLY IF ALL OF THE FOLLOWING ARE TRUE:\n"
+            "  1) The existing memory is a near-duplicate of the NEW one (same entities/relationships) — not just related.\n"
+            "  2) They refer to the same specific event/identity (matching names, numbers, titles, and—if present—dates/times).\n"
+            "  3) There are no material conflicts. Merging will not drop nuance.\n"
+            "If any doubt remains, DO NOT MERGE.\n"
+            "\n"
+            "SCOPE & LIMITS:\n"
+            "  • At most ONE existing memory may be merged. If multiple are similar, pick the single best match and keep the rest.\n"
+            "  • Never generalize or invent facts. Do not merge across different topics or timeframes.\n"
+            "\n"
+            "DELETION POLICY (RARE):\n"
+            "  • Only mark an existing id for deletion if it is a strict duplicate of the NEW memory after merging.\n"
+            "  • Otherwise, do not delete anything.\n"
+            "\n"
+            f"PREFERENCE: {pref}\n"
+            "\n"
+            "OUTPUT:\n"
+            "   Return JSON: { \"new_text\": string, \"delete_ids\": string[] }.\n"
+            "   If NOT MERGING, set delete_ids = [] and set new_text EXACTLY to the NEW memory text.\n"
         )
         lst = "\n".join(f"- ({m.id}) {m.content}" for m in existing) or "- (none)"
-        msgs = [
+        return [
             {"role": "system", "content": sys},
             {"role": "user", "content": f"NEW MEMORY:\n{new_text}\n\nEXISTING CANDIDATES:\n{lst}"}
         ]
-        self.log.debug("merge prompt >>>\n%s\n\n%s", msgs[0]["content"], msgs[1]["content"])
-        return msgs
+
 
 
     def _filter_score(self, score: float | None, floor_val: float)-> bool:
