@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 from src.memory import Memory
 
 DataBases = Literal["stm", "ltm", "users"]
-MessageTypes = Literal["query", "store", "process", "evict", "close", "clear", "unhandled"]
+MessageTypes = Literal["query", "store", "process", "evict", "clear", "count", "close", "unhandled"]
 
 
 class MsgQuery(BaseModel):
@@ -67,6 +67,16 @@ class MsgClear(BaseModel):
     ai_name: str = Field(...)
     target: Literal["stm", "ltm", "users"] = Field(...)
     user: Optional[str] = Field(default=None)
+    
+    
+class MsgCount(BaseModel):
+    type: Literal["count"] = Field(...)
+    uid: str = Field(...)
+    ai_name: str = Field(...)
+    from_: List[Literal["stm", "ltm"]] = Field(..., alias="from", min_length=1, max_length=2)
+
+    class Config:
+        populate_by_name = True
 
 
 class MsgEvict(BaseModel):
@@ -85,13 +95,14 @@ class MsgClose(BaseModel):
     class Config:
         populate_by_name = True
 
-
 def generate_schemas()-> None:
     models: list[tuple[MessageTypes, BaseModel]] = [
         ("query", MsgQuery),
         ("store", MsgStore),
         ("process", MsgProcess),
         ("evict", MsgEvict),
+        ("clear", MsgClear),
+        ("count", MsgCount),
         ("close", MsgClose),
     ]
 
