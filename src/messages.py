@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 from src.memory import Memory
 
 DataBases = Literal["stm", "ltm", "users"]
-MessageTypes = Literal["query", "store", "process", "evict", "close", "unhandled"]
+MessageTypes = Literal["query", "store", "process", "evict", "close", "clear", "unhandled"]
 
 
 class MsgQuery(BaseModel):
@@ -59,6 +59,14 @@ class MsgProcess(BaseModel):
 
     class Config:
         populate_by_name = True
+
+        
+class MsgClear(BaseModel):
+    type: Literal["clear"] = Field(...)
+    uid: str = Field(...)
+    ai_name: str = Field(...)
+    target: Literal["stm", "ltm", "users"] = Field(...)
+    user: Optional[str] = Field(default=None)
 
 
 class MsgEvict(BaseModel):

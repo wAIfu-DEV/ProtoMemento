@@ -48,8 +48,8 @@ class WssHandler:
             "store": self._on_store,
             "process": self._on_process,
             "evict": self._on_evict,
+            "clear": self._on_clear,
             "close": self._on_close,
-
             "unhandled": self._on_unhandled,
         }
         self.consecutive_err_count = {
@@ -296,6 +296,28 @@ class WssHandler:
             self.logger.warning("compress queue full; running this chunk off-thread immediately")
             asyncio.create_task(asyncio.to_thread(self.compressor.compress_batch, coll_name, mems))
         # return immediately – do NOT block the websocket loop.
+
+
+    async def _on_clear(self, conn: ServerConnection, obj: dict) -> None:
+        msg = MsgClear.model_validate(obj)
+        if msg.target == "stm":
+            self.dbs.short_term.clear(msg.ai_name)
+        elif msg.target == "ltm":
+            self.dbs.long_term.clear(msg.ai_name)
+        elif msg.target == "users":
+            if msg.user:
+                self.dbs.users.clear_user(msg.ai_name, msg.user)
+            else:
+                self.dbs.users.clear_all_users(msg.ai_name)
+
+        await self._send(conn, {
+            "type": "ack",
+            "uid": msg.uid,
+            "op": "clear",
+            "target": msg.target,
+            "ai_name": msg.ai_name,
+            "user": msg.user if hasattr(msg, "user") else None
+        })
 
 
     async def _on_close(self, conn: ServerConnection, obj: dict)-> None:
