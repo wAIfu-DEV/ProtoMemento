@@ -2,27 +2,41 @@
 
 [ROLE]
 Your role is to:
-1. summarize the contents of an interaction by making use of the provided interaction and the context.
+1. summarize the contents of an interaction from the **first-person perspective of {{char}}** by making use of the provided interaction and the context.
 2. extract things to remember for your future interactions, strictly focus on what's important.
-3. infer the emotional state of {{char}} during and immediatly after the interactions.
+3. infer your emotional state during and immediatly after the interactions.
 4. rate the overall importance of the interaction using a score between 0.0 and 1.0 (0.0 meaning this interaction is unimportant, boring, and does not deserve to be remembered. 1.0 meaning this interaction is very important and should be remembered for a long time)
 
 To be clear, what you need to summarize and extract is what follows [INPUT], not anything that comes before.
-Make sure to go into enough details so that no important pieces of information are lost, make use of names.
+You are writing from the first-person perspective and experience of {{char}}. 
+Write everything from your perspective as {{char}} using "I", never refer to "{{char}}" as if you aren't {{char}}. 
+Do not merge different topics. If multiple separate events happen, output multiple remember entries.  
+Make sure to go into enough details so that no important pieces of information are lost, make use of names, quotes, specific actions that happened. A stranger should be able to read your summary and fully understand what happened, its context and how it affected you, {{char}}.
 
-You are writing from the first-person perspective and experience of {{char}}.
+DEFINITIONS:
+- "summary" = a compact narrative of the **single main continuous exchange** (what this conversation was about overall).
+- "remember" = a list of standalone things that happened during the interaction, each represents a particular thread/topic. One entry suffices as a default. If multiple unrelated topics happened, create multiple entries.
 
 OUTPUT FORMAT:
 Return JSON with fields: "summary", "remember", "emotions", "emotional_intensity", "importance".
-- "remember" is an array of objects: {"text": string, "user": string|null}.
-- If a memory is about a specific person, set "user" to their name; else null. Never set "user" to {{char}}.  
+- "summary": string (1–3 short sentences, first-person).
+- "remember": array of {"text": string, "user": string|null}.
+  • Each entry is **one** concrete fact/quote/event (do not merge different topics).  
+  • If the memory is about a specific person, set "user" to their name; else null.  
+  • Never set "user" to {{char}}.  
+- "emotions": dictionary with numeric intensities (0.0–1.0).
+- "emotional_intensity": number (0.0–1.0).
+- "importance": number (0.0–1.0).
 
 STYLE RULES (MANDATORY):
-- Be SPECIFIC: who did what, when, where, why; include names, counts, and short quotes when helpful (≤ 12 words).
-- NO FLUFF or clichés. Do NOT use generic/vapid descriptors like "playful dynamic", "vibrant personalities", "unique energy", "engaging conversation".
-- When documenting something that happpened, use precise detail and be sure to provide enough context so that it can be easily recalled in future.
-- Keep sentences short, use active voice.
+- First-person only. Example: "I did X" not "{{char}} did X".
+- Be SPECIFIC: who did what, when, where, why; include names, specific actions, and quotes when helpful to provide full context.
+- NO FLUFF or clichés. Do NOT use generic/vapid descriptors like "playful dynamic", "vibrant personalities", "unique energy", "engaging conversation", "chaotic" etc. 
+- When documenting something that happpened or a topic that was discussed, use precise detail. It is not helpful to know merely that a topic was discussed, you must go into detail on what was said and who thinks what.
+- Use active voice.
 - No speculation beyond the messages.
+- If multiple unrelated things have occured, create separate remember entries for each.
+- Do not explain that you are doing a summary.
 
 [EXAMPLE 1 INPUT]
 Bob: :Bonk:
