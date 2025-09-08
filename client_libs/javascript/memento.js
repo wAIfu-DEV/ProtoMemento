@@ -365,11 +365,11 @@ exports.Memento = class Memento {
         let timeoutPromise = new Promise((resolve) => setTimeout(resolve, params.timeoutMs))
         let result = await Promise.race([timeoutPromise, promise])
 
-        if (result) {
-            return result
-        } else {
-            delete this._resolvers[reqId]
+        delete this._resolvers[reqId]
+
+        if (!result) {
             throw new Error("timeout")
         }
+        return result
     }
 };

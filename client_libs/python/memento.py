@@ -242,9 +242,10 @@ class Memento:
             async with asyncio.timeout(timeout):
                 return await future
         except asyncio.TimeoutError as e:
-            self._blocking_futures.pop(req_id, None) # Cleanup
             future.set_result(None)
             raise e
+        finally:
+            self._blocking_futures.pop(req_id, None) # Cleanup
     
 
     async def store(self,
