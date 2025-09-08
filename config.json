@@ -7,12 +7,12 @@
         "base_url": "https://api.openai.com/v1",
         "model": "gpt-4o-mini",
         "temp": 1.0,
-        "max_completion_tokens": 1000
+        "max_completion_tokens": 4000
     },
     "short_vdb": {
         "device": "cuda",
         "progressive_eviction": true,
-        "max_size_before_evict": 40
+        "max_size_before_evict": 100
     },
     "long_vdb": {
         "device": "cuda",
@@ -25,10 +25,10 @@
     "compression": {
         "enabled": true,
         "score_floor_for_ltm": 0.5,
-        "batch_size": 32,
+        "batch_size": 26,
         "similar_top_k": 5,
         "prefer_new": true,
-        "batch_fraction_on_breach": 0.5,
+        "batch_fraction_on_breach": 0.25,
         "min_batch_on_breach": 1
     }
 }

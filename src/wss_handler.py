@@ -166,6 +166,7 @@ class WssHandler:
         return
 
 
+
     async def _on_query(self, conn: ServerConnection, obj: dict)-> None:
         if obj.get("user", "") is None:
             obj["user"] = ""
@@ -180,42 +181,60 @@ class WssHandler:
             "uid": message.uid,
             "from": message.from_,
         }
-    
+
+        # run selected lookups in parallel
+        tasks = []
+
         if "stm" in message.from_:
             idx = message.from_.index("stm") # to get n of stm
             n = message.n[idx]
-
-            short_query = self.dbs.short_term.query(
+            tasks.append(asyncio.to_thread(
+                self.dbs.short_term.query,
                 coll_name=message.ai_name,
                 query_str=message.query + f" ({message.user})",
                 n=n,
-            )
-            response["stm"] = [x.to_dict() for x in short_query]
-        
+            ))
+
         if "ltm" in message.from_:
             idx = message.from_.index("ltm") # to get n of ltm
             n = message.n[idx]
-
-            long_query = self.dbs.long_term.query(
+            tasks.append(asyncio.to_thread(
+                self.dbs.long_term.query,
                 coll_name=message.ai_name,
                 query_str=f"{message.query} ( {message.user} )",
                 n=n,
-            )
-            response["ltm"] = [x.to_dict() for x in long_query]
-        
+            ))
+
         if "users" in message.from_:
             idx = message.from_.index("users") # to get n of users
             n = message.n[idx]
-
-            user_query = self.dbs.users.query(
+            tasks.append(asyncio.to_thread(
+                self.dbs.users.query,
                 coll_name=message.ai_name,
                 user=message.user,
                 n=n,
-            )
-            response["users"] = [x.to_dict() for x in user_query]
-        
+            ))
+
+        results = await asyncio.gather(*tasks) if tasks else []
+
+        # put results back in the same order the tasks were added
+        k = 0
+        if "stm" in message.from_:
+            short_query = results[k] if k < len(results) else []
+            response["stm"] = [x.to_dict() for x in short_query]
+            k += 1
+        if "ltm" in message.from_:
+            long_query = results[k] if k < len(results) else []
+            response["ltm"] = [x.to_dict() for x in long_query]
+            k += 1
+        if "users" in message.from_:
+            user_query = results[k] if k < len(results) else []
+            response["users"] = [m.to_dict() for m in user_query]
+            k += 1
+
         await self._send(conn, response)
         return
+
 
 
     async def _on_store(self, conn: ServerConnection, obj: dict)-> None:
@@ -296,8 +315,7 @@ class WssHandler:
             self.logger.info("on_evict_chunk: queued for async compression (size=%d)", self._compress_q.qsize())
         except asyncio.QueueFull:
             self.logger.warning("compress queue full; running this chunk off-thread immediately")
-            asyncio.create_task(asyncio.to_thread(self.compressor.compress_batch, coll_name, mems))
-        # return immediately – do NOT block the websocket loop.
+            asyncio.create_task(asyncio.to_thread(self.compressor.compress_batch_async, coll_name, mems))
 
 
     async def _on_clear(self, conn: ServerConnection, obj: dict) -> None:
