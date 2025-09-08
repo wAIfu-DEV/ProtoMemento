@@ -9,7 +9,6 @@ CALL %PY_PATH% -m venv venv
 ECHO Created venv.
 
 ECHO Installing deps...
-REM CALL %CWD%/venv/Scripts/pip.exe install -r torch_req.txt
 CALL %CWD%/venv/Scripts/pip.exe install -r requirements.txt
 ECHO Installed deps.
 

@@ -1,13 +1,14 @@
 import asyncio
 import json
 from math import floor
+
 import time
 import traceback
 import uuid
 import logging
 import asyncio
-from typing import Callable, Coroutine, Literal
-from pathlib import Path
+
+from typing import Callable, Coroutine
 
 from websockets.asyncio.server import Server, ServerConnection
 from websockets import ConnectionClosed
@@ -21,29 +22,29 @@ from src.db_bundle import DbBundle
 
 
 class WssHandler:
-    config: Config
-    env: dict
+    _config: Config
+    _env: dict
 
-    dbs: DbBundle
-    ai: AI
-    logger: logging.Logger
+    _dbs: DbBundle
+    _ai: AI
+    _logger: logging.Logger
 
-    server: Server = None
-    close_server: asyncio.Future
+    _server: Server = None
+    _close_server: asyncio.Future
 
-    handlers: dict[MessageTypes, Callable[[ServerConnection, dict], Coroutine]]
-    consecutive_err_count: dict[str, int]
-    recv_time: int = 0
+    _handlers: dict[MessageTypes, Callable[[ServerConnection, dict], Coroutine]]
+    _consecutive_err_count: dict[str, int]
+    _recv_time: int = 0
 
 
     def __init__(self, database_bundle: DbBundle, config: Config, env: dict)-> None:
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self._logger = logging.getLogger(self.__class__.__name__)
         
-        self.config = config
-        self.env = env
+        self._config = config
+        self._env = env
         
-        self.dbs = database_bundle
-        self.handlers = {
+        self._dbs = database_bundle
+        self._handlers = {
             "query": self._on_query,
             "store": self._on_store,
             "process": self._on_process,
@@ -53,30 +54,30 @@ class WssHandler:
             "close": self._on_close,
             "unhandled": self._on_unhandled,
         }
-        self.consecutive_err_count = {
+        self._consecutive_err_count = {
             "send": 0
         }
 
-        self.ai = AI(
+        self._ai = AI(
             base_url=config.openllm.base_url,
             model_name=config.openllm.model,
             api_key=env["OPENAI_API_KEY"],
             config=config
         )
-        self.compressor = Compressor(ai=self.ai, long_vdb=self.dbs.long_term, config=self.config)
+        self.compressor = Compressor(ai=self._ai, long_vdb=self._dbs.long_term, config=self._config)
 
         self._compress_q: asyncio.Queue[tuple[str, list[Memory]]] = asyncio.Queue(maxsize=8)
         self._compress_worker_task = asyncio.create_task(self._compressor_worker())
 
-        self.dbs.short_term.set_on_evict(self._on_evict_chunk)
-        self.logger.info("initialized wss handler")
+        self._dbs.short_term.set_on_evict(self._on_evict_chunk)
+        self._logger.info("initialized wss handler")
         return
 
 
     async def bind_and_wait(self, server: Server)-> None:
-        self.server = server
-        self.close_server = asyncio.Future()
-        await self.close_server
+        self._server = server
+        self._close_server = asyncio.Future()
+        await self._close_server
 
 
     async def _send(self, conn: ServerConnection, data: dict)-> None:
@@ -84,9 +85,9 @@ class WssHandler:
             json_data = json.dumps(data)
             await conn.send(json_data, text=True)
             
-            self.logger.info("recv->send latency: %d", int(time.time() * 1_000) - self.recv_time)
-            self.logger.info("sent: %s", json_data)
-            self.consecutive_err_count["send"] = 0
+            self._logger.info("recv->send latency: %d", int(time.time() * 1_000) - self._recv_time)
+            self._logger.info("sent: %s", json_data)
+            self._consecutive_err_count["send"] = 0
 
         except ConnectionClosed as e:
             raise e
@@ -94,12 +95,12 @@ class WssHandler:
         except Exception as e:
             # should not be able to be thrown, would trigger inifine loop
             # since we are using _send_error in the exception handling
-            self.logger.error("error during sending: %s\n%s", str(e), traceback.format_exc())
-            self.consecutive_err_count["send"] = self.consecutive_err_count.get("send", 0) + 1
+            self._logger.error("error during sending: %s\n%s", str(e), traceback.format_exc())
+            self._consecutive_err_count["send"] = self._consecutive_err_count.get("send", 0) + 1
 
-            if self.consecutive_err_count.get("send", 0) > 5:
-                self.logger.error("could not recover after too many errors, closing server.")
-                self.close_server.set_result(None)
+            if self._consecutive_err_count.get("send", 0) > 5:
+                self._logger.error("could not recover after too many errors, closing _server.")
+                self._close_server.set_result(None)
     
 
     async def _send_error(self, conn: ServerConnection, e: Exception, id: str | None = None)-> None:
@@ -121,15 +122,15 @@ class WssHandler:
             try:
                 data = await conn.recv(decode=True)
             except ConnectionClosed:
-                # Should we close server on connection end?
+                # Should we close _server on connection end?
                 # Would limit to one connection per instance, but would make
                 # the app close by itself, which is massive.
                 # Would prevent addr already used errs
-                self.logger.info("connection closed on recv.")
+                self._logger.info("connection closed on recv.")
                 return
 
-            self.recv_time = int(time.time() * 1_000)
-            self.logger.info("received message: %s", data)
+            self._recv_time = int(time.time() * 1_000)
+            self._logger.info("received message: %s", data)
         
             try:
                 obj = json.loads(data)
@@ -151,12 +152,12 @@ class WssHandler:
                 await self._send_error(conn, TypeError("invalid type for value of field \"type\" in message from client"))
                 continue
 
-            msg_handler = self.handlers.get(msg_type, self._on_unhandled)
+            msg_handler = self._handlers.get(msg_type, self._on_unhandled)
 
             try:
                 await msg_handler(conn, obj)
             except ConnectionClosed:
-                self.logger.info("connection closed on send.")
+                self._logger.info("connection closed on send.")
                 return
             except Exception as e:
                 await self._send_error(conn, e, obj["uid"] if "uid" in obj else None)
@@ -189,7 +190,7 @@ class WssHandler:
             idx = message.from_.index("stm") # to get n of stm
             n = message.n[idx]
             tasks.append(asyncio.to_thread(
-                self.dbs.short_term.query,
+                self._dbs.short_term.query,
                 coll_name=message.ai_name,
                 query_str=message.query + f" ({message.user})",
                 n=n,
@@ -199,7 +200,7 @@ class WssHandler:
             idx = message.from_.index("ltm") # to get n of ltm
             n = message.n[idx]
             tasks.append(asyncio.to_thread(
-                self.dbs.long_term.query,
+                self._dbs.long_term.query,
                 coll_name=message.ai_name,
                 query_str=f"{message.query} ( {message.user} )",
                 n=n,
@@ -209,7 +210,7 @@ class WssHandler:
             idx = message.from_.index("users") # to get n of users
             n = message.n[idx]
             tasks.append(asyncio.to_thread(
-                self.dbs.users.query,
+                self._dbs.users.query,
                 coll_name=message.ai_name,
                 user=message.user,
                 n=n,
@@ -244,21 +245,21 @@ class WssHandler:
             for mem in message.memories:
                 match dest:
                     case "stm":
-                        self.dbs.short_term.store(coll_name=message.ai_name, memory=mem)
+                        self._dbs.short_term.store(coll_name=message.ai_name, memory=mem)
                     case "ltm":
-                        self.dbs.long_term.store(coll_name=message.ai_name, memory=mem)
+                        self._dbs.long_term.store(coll_name=message.ai_name, memory=mem)
                     case "users":
                         if mem.user is None: continue # No user associated with mem
-                        self.dbs.users.store(coll_name=message.ai_name, user=mem.user, memory=mem)
+                        self._dbs.users.store(coll_name=message.ai_name, user=mem.user, memory=mem)
         
-        self.logger.info("stored memories.")
+        self._logger.info("stored memories.")
         return
 
 
     async def _on_process(self, conn: ServerConnection, obj: dict)-> None:
         message = MsgProcess.model_validate(obj)
         
-        res = await self.ai.process(
+        res = await self._ai.process(
             ai_name=message.ai_name,
             context=message.context if message.context is not None else [],
             messages=message.messages,
@@ -273,9 +274,9 @@ class WssHandler:
         mem_time = int(time.time() * 1000.0) # timestamp in ms
 
         score = (res.emotional_intensity + res.importance) / 2.0
-        lifetime = floor(score * self.config.long_vdb.max_memory_lifetime)
+        lifetime = floor(score * self._config.long_vdb.max_memory_lifetime)
 
-        self.dbs.short_term.store(message.ai_name, Memory(
+        self._dbs.short_term.store(message.ai_name, Memory(
             id=str(uuid.uuid4()),
             content=res.summary,
             user=None,
@@ -293,42 +294,42 @@ class WssHandler:
                 score=score,
                 lifetime=lifetime,
             )
-            self.dbs.short_term.store(message.ai_name, mem)
+            self._dbs.short_term.store(message.ai_name, mem)
             if rem.user is not None:
-                self.dbs.users.store(coll_name=message.ai_name, user=rem.user, memory=mem)
+                self._dbs.users.store(coll_name=message.ai_name, user=rem.user, memory=mem)
         
-        self.logger.info("processed messages from client.")
+        self._logger.info("processed messages from client.")
         return
 
 
     async def _on_evict(self, conn: ServerConnection, obj: dict)-> None:
         message = MsgEvict.model_validate(obj)
-        self.dbs.short_term.evict_all(message.ai_name)
-        self.logger.info("evicted messages from collection: %s", message.ai_name)
+        self._dbs.short_term.evict_all(message.ai_name)
+        self._logger.info("evicted messages from collection: %s", message.ai_name)
         return
         
     def _on_evict_chunk(self, coll_name: str, mems: list[Memory]) -> None:
-        self.logger.info("on_evict_chunk: coll=%s batch=%d", coll_name, len(mems))
+        self._logger.info("on_evict_chunk: coll=%s batch=%d", coll_name, len(mems))
         # Try to enqueue quickly; if queue is full, fall back to fire-and-forget off-thread task.
         try:
             self._compress_q.put_nowait((coll_name, mems))
-            self.logger.info("on_evict_chunk: queued for async compression (size=%d)", self._compress_q.qsize())
+            self._logger.info("on_evict_chunk: queued for async compression (size=%d)", self._compress_q.qsize())
         except asyncio.QueueFull:
-            self.logger.warning("compress queue full; running this chunk off-thread immediately")
+            self._logger.warning("compress queue full; running this chunk off-thread immediately")
             asyncio.create_task(asyncio.to_thread(self.compressor.compress_batch_async, coll_name, mems))
 
 
     async def _on_clear(self, conn: ServerConnection, obj: dict) -> None:
         msg = MsgClear.model_validate(obj)
         if msg.target == "stm":
-            self.dbs.short_term.clear(msg.ai_name)
+            self._dbs.short_term.clear(msg.ai_name)
         elif msg.target == "ltm":
-            self.dbs.long_term.clear(msg.ai_name)
+            self._dbs.long_term.clear(msg.ai_name)
         elif msg.target == "users":
             if msg.user:
-                self.dbs.users.clear_user(msg.ai_name, msg.user)
+                self._dbs.users.clear_user(msg.ai_name, msg.user)
             else:
-                self.dbs.users.clear_all_users(msg.ai_name)
+                self._dbs.users.clear_all_users(msg.ai_name)
 
         await self._send(conn, {
             "type": "clear",
@@ -342,8 +343,9 @@ class WssHandler:
 
     async def _on_close(self, conn: ServerConnection, obj: dict)-> None:
         _ = MsgClose.model_validate(obj)
-        self.logger.info("received close message.")
-        self.close_server.set_result(None)
+        self._logger.info("received close message.")
+        self._compress_worker_task.cancel()
+        self._close_server.set_result(None)
         return
         
         
@@ -356,28 +358,28 @@ class WssHandler:
             "ai_name": message.ai_name,
         }
         if "stm" in message.from_:
-            resp["stm"] = self.dbs.short_term.count(message.ai_name)
+            resp["stm"] = self._dbs.short_term.count(message.ai_name)
         if "ltm" in message.from_:
-            resp["ltm"] = self.dbs.long_term.count(message.ai_name)
+            resp["ltm"] = self._dbs.long_term.count(message.ai_name)
 
         await self._send(conn, resp)
 
 
     async def _on_unhandled(self, conn: ServerConnection, obj: dict)-> None:
-        self.logger.info("received unhandled message.")
+        self._logger.info("received unhandled message.")
         raise ValueError("received message with unhandled message type: " + json.dumps(obj))
 
 
     async def _compressor_worker(self) -> None:
-        self.logger.info("compressor worker: started")
+        self._logger.info("compressor worker: started")
         while True:
             coll_name, mems = await self._compress_q.get()
             try:
-                size = self.config.compression.batch_size
+                size = self._config.compression.batch_size
                 for i in range(0, len(mems), size):
                     sub = mems[i:i+size]
                     await self.compressor.compress_batch_async(coll_name, sub)
             except Exception as e:
-                self.logger.exception("compression failed during eviction for '%s': %s", coll_name, e)
+                self._logger.exception("compression failed during eviction for '%s': %s", coll_name, e)
             finally:
                 self._compress_q.task_done()

@@ -1,3 +1,4 @@
 - better error handling for openai calls, risk of data loss
 - change relative paths to Path(__file__).parent
 - switch user database from JSON to CSV
+- client libraries for C#, python, JS, Godot, Go

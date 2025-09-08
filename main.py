@@ -1,48 +1,25 @@
 import asyncio
 import logging
+import sys
+
+import onnxruntime
 from websockets.asyncio.server import serve
 
 #from src.messages import generate_schemas
-from src.env import parse_env
-from src.config import parse_config
-from src.vdbs.evicting_vdb import EvictingVdb
-from src.vdbs.decaying_vdb import DecayingVdb
-from src.vdbs.vdb_chroma import VdbChroma
-from src.user_database import UserDatabase
-from src.db_bundle import DbBundle
+from src.args import        parse_args
+from src.dump import        dump_all_dbs
+from src.env import         parse_env
+from src.config import      parse_config
+from src.logging import     logging_init
+from src.decay import       periodic_decay
+from src.db_bundle import   databases_init
 from src.wss_handler import WssHandler
-
-import onnxruntime
-
-
-async def periodic_decay(decay_vdb: DecayingVdb):
-    try:
-        while True:
-            decay_vdb.decay_all()
-            await asyncio.sleep(60 * 60 * 12) # every 6 hours, will skip if date diff < 1
-        
-    except asyncio.CancelledError:
-        return
 
 
 async def main():
+    parsed_args = parse_args(sys.argv[1:])
     
-    # silence the telemetry error spam
-    for name in (
-        "chromadb.telemetry",
-        "chromadb.telemetry.product",
-        "chromadb.telemetry.product.posthog",):
-        log = logging.getLogger(name)
-        log.setLevel(logging.CRITICAL)
-        log.propagate = False
-        log.handlers.clear()
-        log.addHandler(logging.NullHandler())
-    
-    logging.basicConfig(
-        format="[%(asctime)s][%(name)s.%(funcName)s] %(message)s",
-        datefmt="%m/%d %H:%M:%S",
-        level=logging.INFO
-    )
+    logging_init()
     logger = logging.getLogger("global")
 
     logger.info("available onnxruntime providers: %s", ", ".join(onnxruntime.get_available_providers()))
@@ -54,39 +31,14 @@ async def main():
     #generate_schemas() # generate schemas for inbound Ws messages
 
     logger.info("initializing databases...")
-    short_size = conf.short_vdb.max_size_before_evict + 10\
-                      if conf.short_vdb.progressive_eviction and conf.short_vdb.max_size_before_evict > 0\
-                      else -1
+    bundle = databases_init(conf)
 
-    short_vdb = VdbChroma(
-        db_name="short",
-        size_limit=short_size,
-        device=conf.short_vdb.device,
-    )
-    long_vdb = VdbChroma(
-        db_name="long",
-        size_limit=conf.long_vdb.max_size,
-        device=conf.long_vdb.device,
-    )
+    if parsed_args.dump:
+        dump_all_dbs(bundle, conf)
+        return
 
-    # implement progressive_eviction from config
-    short_evicting = EvictingVdb(
-        wrapped_vdb=short_vdb,
-        dest_vdb=long_vdb,
-        progressive_eviction=conf.short_vdb.progressive_eviction,
-        max_size_before_evict=conf.short_vdb.max_size_before_evict,
-        evict_fraction=conf.compression.batch_fraction_on_breach,
-        evict_min_batch=conf.compression.min_batch_on_breach,
-    )
-
-    long_decaying = DecayingVdb(wrapped_vdb=long_vdb)
-
-    user_db = UserDatabase(size_limit_per_user=conf.user_db.max_size_per_user)
-
-    bundle = DbBundle(short=short_evicting, long=long_decaying, users=user_db)
-
-    # decay routine
-    decay_task = asyncio.create_task(periodic_decay(long_decaying))
+    logger.info("running periodic decay routine")
+    decay_task = asyncio.create_task(periodic_decay(bundle.long_term))
 
     wss_handler = WssHandler(database_bundle=bundle, config=conf, env=env)
     async with serve(wss_handler.handle, host=conf.wss.host, port=conf.wss.port) as wss:

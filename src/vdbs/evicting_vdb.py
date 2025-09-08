@@ -127,8 +127,12 @@ class EvictingVdb(VectorDataBase):
         return self.wrapped.count(coll_name)
     
 
-    def pop_oldest(self, coll_name: str, n: int = 1)-> list[Memory]:
+    def pop_oldest(self, coll_name: str, n: int | None = 1)-> list[Memory]:
         return self.wrapped.pop_oldest(coll_name, n)
+    
+
+    def peek_oldest(self, coll_name: str, n: int | None = 1) -> list[Memory]:
+        return self.wrapped.peek_oldest(coll_name, n)
 
 
     def evict_all(self, coll_name: str) -> None:

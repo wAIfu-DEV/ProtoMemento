@@ -149,7 +149,7 @@ class VdbChroma(VectorDataBase):
         return final
 
 
-    def pop_oldest(self, coll_name: str, n: int = 1) -> list[Memory]:
+    def pop_oldest(self, coll_name: str, n: int | None = 1) -> list[Memory]:
         coll = self._get_collection(coll_name)
         res = coll.get(ids=None, offset=0, limit=n)
 
@@ -167,6 +167,28 @@ class VdbChroma(VectorDataBase):
             )
             final.append(mem)
             coll.delete(ids=[mem.id])
+        
+        return final
+
+    
+    # Same as pop_oldest, but doesn't delete from collection
+    def peek_oldest(self, coll_name: str, n: int | None = 1) -> list[Memory]:
+        coll = self._get_collection(coll_name)
+        res = coll.get(ids=None, offset=0, limit=n)
+
+        final: list[Memory] = []
+        res_len = len(res["documents"])
+        for i in range(res_len):
+            meta = res["metadatas"][i]
+            mem: Memory = Memory(
+                id=      res["ids"][i],
+                content= res["documents"][i],
+                time=    meta.get("t", 0),
+                user=    meta.get("u", None),
+                score=   meta.get("s", None),
+                lifetime=meta.get("l", None),
+            )
+            final.append(mem)
         
         return final
 
@@ -189,7 +211,7 @@ class VdbChroma(VectorDataBase):
     def get_collection_names(self) -> list[str]:
         suffix = f"_{self.name}"
         all_cols = self.client.list_collections()
-        suffix_cols = [c.name for c in all_cols if c.name.endswith(suffix)]
+        suffix_cols = [c for c in all_cols if c.endswith(suffix)]
         logical_names = [name[:-len(suffix)] for name in suffix_cols]
         return logical_names
 

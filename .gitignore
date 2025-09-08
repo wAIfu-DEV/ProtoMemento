@@ -5,3 +5,4 @@ users
 .env*
 "decay_meta/"
 cudnn*
+dump.json

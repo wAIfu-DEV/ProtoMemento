@@ -143,3 +143,13 @@ class UserDatabase:
             if os.path.isfile(p) and p.endswith(".json"):
                 with open(p, "w", encoding="utf-8") as f:
                     f.write('{"mems": []}')
+    
+
+    def get_collaction_names(self)-> list[str]:
+        colls_dir = os.path.join(".", "users")
+
+        names = []
+        for name in os.listdir(colls_dir):
+            if "." not in name:
+                names.append(name)
+        return names
