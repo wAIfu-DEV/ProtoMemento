@@ -83,6 +83,7 @@ class WssHandler:
         try:
             json_data = json.dumps(data)
             await conn.send(json_data, text=True)
+            
             self.logger.info("recv->send latency: %d", int(time.time() * 1_000) - self.recv_time)
             self.logger.info("sent: %s", json_data)
             self.consecutive_err_count["send"] = 0

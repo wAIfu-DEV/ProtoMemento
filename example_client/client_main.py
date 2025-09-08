@@ -9,6 +9,9 @@ from websockets.asyncio.client import connect, ClientConnection
 send_time = 0
 repeat_obj = {}
 
+message_types = ["store", "query", "evict", "process", "close", "repeat"]
+msg_type_inp_question = f"\nmsg type ({", ".join(message_types)}): "
+
 def recv_routine(ws: ClientConnection):
     asyncio.run(recv_routine_wrapped(ws))
 
@@ -17,9 +20,11 @@ async def recv_routine_wrapped(ws: ClientConnection):
         try:
             async with asyncio.timeout(0.5):
                 data = await ws.recv(decode=True)
-                print("client-side latency: ", int(time.time() * 1_000) - send_time, "ms")
-                print("Received: ", json.dumps(json.loads(data), indent=4))
-                print("\nmsg type (store, query, evict, process, count, clear, close): ", end="", flush=True)
+
+                recv_time = int(time.time() * 1_000)
+                print("\nReceived: ", json.dumps(json.loads(data), indent=4))
+                print("client-side latency: ", recv_time - send_time, "ms")
+                print(msg_type_inp_question, end="", flush=True)
         except:
             continue
 
@@ -45,7 +50,7 @@ async def main():
         asyncio.create_task(asyncio.to_thread(recv_routine, ws))
         
         while True:
-            inp = await async_input("msg type (store, query, evict, process, count, clear, close, repeat): ")
+            inp = await async_input(msg_type_inp_question)
             match inp:
                 case "store":
                     content = await async_input("content: ")
