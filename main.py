@@ -12,7 +12,6 @@ from src.user_database import UserDatabase
 from src.db_bundle import DbBundle
 from src.wss_handler import WssHandler
 
-
 async def periodic_decay(decay_vdb: DecayingVdb):
     try:
         while True:
@@ -24,6 +23,18 @@ async def periodic_decay(decay_vdb: DecayingVdb):
 
 
 async def main():
+    
+    # silence the telemetry error spam
+    for name in (
+        "chromadb.telemetry",
+        "chromadb.telemetry.product",
+        "chromadb.telemetry.product.posthog",):
+        log = logging.getLogger(name)
+        log.setLevel(logging.CRITICAL)
+        log.propagate = False
+        log.handlers.clear()
+        log.addHandler(logging.NullHandler())
+    
     logging.basicConfig(
         format="[%(asctime)s][%(name)s.%(funcName)s] %(message)s",
         datefmt="%m/%d %H:%M:%S",
