@@ -27,11 +27,14 @@ def dump_all_dbs(bundle: DbBundle, conf: Config)-> None:
         })
     
     for coll_name in bundle.users.get_collaction_names():
-        mems = bundle.users.query(coll_name, conf.user_db.max_size_per_user + 1)
-        obj["users"].append({
-            "coll": coll_name,
-            "mems": [x.to_dict() for x in mems]
-        })
+        coll_obj = {"coll": coll_name, "users": []}
+        for user in bundle.users.get_collection_users(coll_name):
+            mems = bundle.users.query(coll_name, user, n=conf.user_db.max_size_per_user + 1)
+            coll_obj["users"].append({
+                "user": user,
+                "mems": [x.to_dict() for x in mems]
+            })
+        obj["users"] = coll_obj
     
     with open("dump.json", "w+", encoding="utf-8") as f:
         json.dump(obj, f)

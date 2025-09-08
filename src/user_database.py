@@ -153,3 +153,13 @@ class UserDatabase:
             if "." not in name:
                 names.append(name)
         return names
+
+
+    def get_collection_users(self, coll_name: str)-> list[str]:
+        coll_dir = os.path.join(".", "users", self._sanitize_name(coll_name))
+
+        names = []
+        for name in os.listdir(coll_dir):
+            if ".json" in name:
+                names.append(name.removesuffix(".json"))
+        return names
