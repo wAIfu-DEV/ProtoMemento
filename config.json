@@ -11,7 +11,7 @@
     },
     "short_vdb": {
         "progressive_eviction": true,
-        "max_size_before_evict": 40
+        "max_size_before_evict": 100
     },
     "long_vdb": {
         "max_size": 5000,
@@ -23,10 +23,10 @@
     "compression": {
         "enabled": true,
         "score_floor_for_ltm": 0.5,
-        "batch_size": 24,
+        "batch_size": 26,
         "similar_top_k": 5,
         "prefer_new": true,
-        "batch_fraction_on_breach": 0.5,
+        "batch_fraction_on_breach": 0.25,
         "min_batch_on_breach": 1
     }
 }
