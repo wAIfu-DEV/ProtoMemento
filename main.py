@@ -12,6 +12,8 @@ from src.user_database import UserDatabase
 from src.db_bundle import DbBundle
 from src.wss_handler import WssHandler
 
+import onnxruntime
+
 
 async def periodic_decay(decay_vdb: DecayingVdb):
     try:
@@ -31,6 +33,8 @@ async def main():
     )
     logger = logging.getLogger("global")
 
+    logger.info("available onnxruntime providers: %s", ", ".join(onnxruntime.get_available_providers()))
+
     logger.info("reading config & env")
     env = parse_env()
     conf = parse_config()
@@ -42,8 +46,16 @@ async def main():
                       if conf.short_vdb.progressive_eviction and conf.short_vdb.max_size_before_evict > 0\
                       else -1
 
-    short_vdb = VdbChroma(db_name="short", size_limit=short_size)
-    long_vdb = VdbChroma(db_name="long", size_limit=conf.long_vdb.max_size)
+    short_vdb = VdbChroma(
+        db_name="short",
+        size_limit=short_size,
+        device=conf.short_vdb.device,
+    )
+    long_vdb = VdbChroma(
+        db_name="long",
+        size_limit=conf.long_vdb.max_size,
+        device=conf.long_vdb.device,
+    )
 
     # implement progressive_eviction from config
     short_evicting = EvictingVdb(

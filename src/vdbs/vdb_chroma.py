@@ -1,8 +1,11 @@
 import logging
 import os
 import time
+from typing import Callable, Literal
 from chromadb import Client, ClientAPI, Collection, Settings
 from chromadb.errors import NotFoundError
+from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2, DefaultEmbeddingFunction
+from chromadb.utils.embedding_functions.sentence_transformer_embedding_function import SentenceTransformerEmbeddingFunction
 
 from src.vdbs.vector_database import VectorDataBase
 from src.memory import Memory, QueriedMemory
@@ -32,9 +35,10 @@ class VdbChroma(VectorDataBase):
     size_limit: int = -1
     name: str
     logger: logging.Logger
+    embedding_function: ONNXMiniLM_L6_V2 | SentenceTransformerEmbeddingFunction
 
 
-    def __init__(self, db_name: str, size_limit: int = -1)-> None:
+    def __init__(self, db_name: str, size_limit: int = -1, device: Literal["cpu", "cuda"] = "cuda")-> None:
         self.logger = logging.getLogger(f"{self.__class__.__name__}({db_name})")
         self.size_limit = size_limit
         self.name = db_name
@@ -42,13 +46,19 @@ class VdbChroma(VectorDataBase):
         client_singleton = ChromaClientSingleton()
         self.client = client_singleton.client
 
+        if device == "cuda":
+            self.embedding_function = ONNXMiniLM_L6_V2(preferred_providers=['CUDAExecutionProvider'])
+            #self.embedding_function = SentenceTransformerEmbeddingFunction(model_name="sentence-transformers/all-MiniLM-L6-v2", device="cuda")
+        else:
+            self.embedding_function = ONNXMiniLM_L6_V2(preferred_providers=['CPUExecutionProvider'])
+
         self.coll_cache = {}  # instance-local cache
         self.logger.info("initialized %s vector database", db_name)
         return
 
 
     def _unique_coll_name(self, coll_name: str)-> str:
-        return coll_name + f"_{self.name}"
+        return f"{coll_name}_{self.name}"
 
 
     def _get_collection(self, coll_name: str)-> Collection:
@@ -56,7 +66,10 @@ class VdbChroma(VectorDataBase):
 
         collection: Collection
         if not unique_name in self.coll_cache:
-            collection = self.client.get_or_create_collection(name=unique_name)
+            collection = self.client.get_or_create_collection(
+                name=unique_name,
+                embedding_function=self.embedding_function,
+            )
             self.coll_cache[unique_name] = collection
         else:
             collection = self.coll_cache[unique_name]

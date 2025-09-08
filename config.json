@@ -10,10 +10,12 @@
         "max_completion_tokens": 1000
     },
     "short_vdb": {
+        "device": "cuda",
         "progressive_eviction": true,
         "max_size_before_evict": 40
     },
     "long_vdb": {
+        "device": "cuda",
         "max_size": 5000,
         "max_memory_lifetime": 180
     },

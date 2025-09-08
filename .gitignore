@@ -4,3 +4,4 @@ decay_meta
 users
 .env*
 "decay_meta/"
+cudnn*

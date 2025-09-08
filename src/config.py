@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Literal
 from pydantic import BaseModel, Field
 
 
@@ -16,11 +17,13 @@ class OpenLlmConfig(BaseModel):
 
 
 class ShortVdbConfig(BaseModel):
+    device: Literal["cuda", "cpu"] = Field("cuda")
     progressive_eviction: bool = Field(True)
     max_size_before_evict: int = Field(500)
 
 
 class LongVdbConfig(BaseModel):
+    device: Literal["cuda", "cpu"] = Field("cuda")
     max_size: int = Field(5_000)
     max_memory_lifetime: int = Field(180)
 
