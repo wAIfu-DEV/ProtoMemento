@@ -1,6 +1,6 @@
 import json
 import uuid
-from typing import Optional, Self
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
@@ -18,7 +18,7 @@ class Memory(BaseModel):
     
 
     @staticmethod
-    def from_dict(input: dict)-> Self:
+    def from_dict(input: dict):
         return Memory(
             id=input.get("id", uuid.uuid4()),
             content=input.get("content", ""),

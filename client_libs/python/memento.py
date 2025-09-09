@@ -14,7 +14,7 @@ from enum import Enum
 import websockets.sync.client
 from websockets.asyncio.client import ClientConnection, connect
 
-from typing import Optional, Self
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
@@ -32,7 +32,7 @@ class Memory(BaseModel):
     
 
     @staticmethod
-    def from_dict(input: dict)-> Self:
+    def from_dict(input: dict):
         return Memory(
             id=input.get("id", str(uuid.uuid4())),
             content=input.get("content", ""),
@@ -66,7 +66,7 @@ class QueriedMemory(BaseModel):
     distance: float = Field(...)
     
     @staticmethod
-    def from_dict(input: dict)-> Self:
+    def from_dict(input: dict):
         mem: dict = input.get("memory", None)
         return QueriedMemory(
             memory=Memory(
