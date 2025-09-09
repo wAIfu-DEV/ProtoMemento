@@ -359,15 +359,6 @@ class WssHandler:
             else:
                 self._dbs.users.clear_all_users(msg.ai_name)
 
-        await self._send(conn, {
-            "type": "clear",
-            "uid": msg.uid,
-            "op": "clear",
-            "target": msg.target,
-            "ai_name": msg.ai_name,
-            "user": msg.user if hasattr(msg, "user") else None
-        })
-
 
     async def _on_close(self, conn: ServerConnection, obj: dict)-> None:
         _ = MsgClose.model_validate(obj)

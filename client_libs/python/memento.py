@@ -109,13 +109,18 @@ class QueryResult:
     users: list[Memory]
 
 
+class CountResult:
+    short_term: int
+    long_term: int
+
+
 class Memento:
     _conn: ClientConnection
     _proc: subprocess.Popen
     _uri: str
 
     _summary_cb: Callable[[str], None] = None
-    _blocking_futures: dict[str, asyncio.Future] = {}
+    _pending_requests: dict[str, asyncio.Future] = {}
 
 
     def __init__(self, abs_dir: str = "", host: str = "127.0.0.1", port: int = 4286, loop=None):
@@ -193,10 +198,11 @@ class Memento:
                             res.long_term = [QueriedMemory.from_dict(x) for x in obj["ltm"]]
                         if "users" in dbs:
                             res.users = [Memory.from_dict(x) for x in obj["users"]]
-                        
-                        if message_id in self._blocking_futures:
-                            future = self._blocking_futures[message_id]
-                            future.set_result(res)
+
+                        if message_id in self._pending_requests:
+                            future = self._pending_requests.pop(message_id, None)
+                            if future:
+                                future.set_result(res)
                         else:
                             raise Exception("received unhandled response to query request.")
 
@@ -206,6 +212,22 @@ class Memento:
                         
                         summary: str = obj["summary"]
                         self._summary_cb(summary)
+                    
+                    case "count":
+                        res = CountResult()
+                        
+                        if "stm" in obj:
+                            res.short_term = obj["stm"]
+                        if "ltm" in obj:
+                            res.long_term = obj["ltm"]
+                        
+                        if message_id in self._pending_requests:
+                            future = self._pending_requests.pop(message_id, None)
+                            if future:
+                                future.set_result(res)
+                        else:
+                            raise Exception("received unhandled response to count request.")
+                        
     
     
     def set_on_summary(self, cb: Callable[[str], None]):
@@ -223,7 +245,7 @@ class Memento:
 
         req_id = str(uuid.uuid4())
         future: asyncio.Future[QueryResult] = asyncio.Future()
-        self._blocking_futures[req_id] = future
+        self._pending_requests[req_id] = future
         
         await self._conn.send(
             message=json.dumps({
@@ -244,9 +266,7 @@ class Memento:
         except asyncio.TimeoutError as e:
             future.set_result(None)
             raise e
-        finally:
-            self._blocking_futures.pop(req_id, None) # Cleanup
-    
+
 
     async def store(self,
             memories: list[Memory],
@@ -264,7 +284,7 @@ class Memento:
             }),
             text=True,
         )
-    
+
 
     async def process(self,
             messages: list[OpenLlmMsg],
@@ -285,7 +305,7 @@ class Memento:
             }),
             text=True,
         )
-    
+
 
     async def close(self)-> None:
         await self._conn.send(
@@ -295,7 +315,55 @@ class Memento:
             }),
             text=True,
         )
-
-        
     
+    async def evict(self, collection_name: str = "default")-> None:
+        await self._conn.send(
+            message=json.dumps({
+                "uid": str(uuid.uuid4()),
+                "type": "evict",
+                "ai_name": collection_name,
+            }),
+            text=True,
+        )
+    
+    async def clear(self,
+            collection_name: str = "default",
+            target: list[DbEnum] = [DbEnum.SHORT_TERM, DbEnum.LONG_TERM, DbEnum.USERS],
+        )-> None:
 
+        await self._conn.send(
+            message=json.dumps({
+                "uid": str(uuid.uuid4()),
+                "type": "clear",
+                "ai_name": collection_name,
+                "target": [x.value for x in target],
+            }),
+            text=True,
+        )
+    
+    async def count(self,
+            collection_name: str = "default",
+            _from: list[DbEnum] = [DbEnum.SHORT_TERM, DbEnum.LONG_TERM, DbEnum.USERS],
+            timeout: float = 5.0,
+        )-> None:
+
+        req_id = str(uuid.uuid4())
+        future: asyncio.Future[CountResult] = asyncio.Future()
+        self._pending_requests[req_id] = future
+        
+        await self._conn.send(
+            message=json.dumps({
+                "uid": req_id,
+                "type": "count",
+                "ai_name": collection_name,
+                "from": [x.value for x in _from],
+            }),
+            text=True,
+        )
+
+        try:
+            async with asyncio.timeout(timeout):
+                return await future
+        except asyncio.TimeoutError as e:
+            future.set_result(None)
+            raise e

@@ -54,8 +54,8 @@ class Memory {
     toJson() {
         return JSON.stringify(this.toRecord());
     }
-};
-exports.Memory = Memory
+}
+exports.Memory = Memory;
 
 class QueriedMemory {
     /** @type {Memory} */ memory;
@@ -89,15 +89,15 @@ class QueriedMemory {
     toJson() {
         return JSON.stringify(this.toRecord());
     }
-};
-exports.QueriedMemory = QueriedMemory
+}
+exports.QueriedMemory = QueriedMemory;
 
 class QueryResult {
-    /** @type {QueriedMemory[]} */ shortTerm
-    /** @type {QueriedMemory[]} */ longTerm
-    /** @type {Memory[]} */        users
+    /** @type {QueriedMemory[]} */ shortTerm;
+    /** @type {QueriedMemory[]} */ longTerm;
+    /** @type {Memory[]} */ users;
 }
-exports.QueryResult = QueryResult
+exports.QueryResult = QueryResult;
 
 class WSWrapper {
     constructor(url, options = {}) {
@@ -306,26 +306,28 @@ exports.Memento = class Memento {
 
         switch (msgType) {
             case "query": {
-                let res = new QueryResult()
-                let dbs = obj["from"]
-                
+                let res = new QueryResult();
+                let dbs = obj["from"];
+
                 if ("stm" in dbs)
                     for (let x of obj["stm"])
-                        res.shortTerm.push(QueriedMemory.fromRecord(x))
+                        res.shortTerm.push(QueriedMemory.fromRecord(x));
 
                 if ("ltm" in dbs)
                     for (let x of obj["ltm"])
-                        res.longTerm.push(QueriedMemory.fromRecord(x))
-                
+                        res.longTerm.push(QueriedMemory.fromRecord(x));
+
                 if ("users" in dbs)
                     for (let x of obj["users"])
-                        res.users.push(Memory.fromRecord(x))
-                
+                        res.users.push(Memory.fromRecord(x));
+
                 if (msgId in this._resolvers) {
-                    let resolver = this._resolvers[msgId]
-                    resolver(res)
+                    let resolver = this._resolvers[msgId];
+                    resolver(res);
                 } else {
-                    throw new Error("received unhandled response to query request.")
+                    throw new Error(
+                        "received unhandled response to query request."
+                    );
                 }
             }
         }
@@ -336,40 +338,47 @@ exports.Memento = class Memento {
      * @param params
      * @returns {Promise<QueryResult>}
      */
-    async query(queryStr, params = {
-        collectionName: "default",
-        user: null,
-        from: ["stm", "ltm", "users"],
-        n: [1, 1, 1],
-        timeoutMs: 5_000,
-    }) {
-        let reqId = randomUUID()
+    async query(
+        queryStr,
+        params = {
+            collectionName: "default",
+            user: null,
+            from: ["stm", "ltm", "users"],
+            n: [1, 1, 1],
+            timeoutMs: 5_000,
+        }
+    ) {
+        let reqId = randomUUID();
 
-        let resolver = undefined
+        let resolver = undefined;
         let promise = new Promise((resolve) => {
-            resolver = resolve
-        })
+            resolver = resolve;
+        });
 
-        this._resolvers[reqId] = resolver
+        this._resolvers[reqId] = resolver;
 
-        this._conn.send(JSON.stringify({
-            "uid": reqId,
-            "type": "query",
-            "query": queryStr,
-            "ai_name": collectionName,
-            "user": user,
-            "from": from,
-            "n": n,
-        }))
+        this._conn.send(
+            JSON.stringify({
+                uid: reqId,
+                type: "query",
+                query: queryStr,
+                ai_name: collectionName,
+                user: user,
+                from: from,
+                n: n,
+            })
+        );
 
-        let timeoutPromise = new Promise((resolve) => setTimeout(resolve, params.timeoutMs))
-        let result = await Promise.race([timeoutPromise, promise])
+        let timeoutPromise = new Promise((resolve) =>
+            setTimeout(resolve, params.timeoutMs)
+        );
+        let result = await Promise.race([timeoutPromise, promise]);
 
-        delete this._resolvers[reqId]
+        delete this._resolvers[reqId];
 
         if (!result) {
-            throw new Error("timeout")
+            throw new Error("timeout");
         }
-        return result
+        return result;
     }
 };
