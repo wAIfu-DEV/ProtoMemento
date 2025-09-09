@@ -192,15 +192,6 @@ class WssHandler:
             except Exception as e:
                 await self._send_error(conn, e, obj["uid"] if "uid" in obj else None)
                 continue
-
-            try:
-                await msg_handler(conn, obj)
-            except ConnectionClosed:
-                self._logger.info("connection closed on send.")
-                return
-            except Exception as e:
-                await self._send_error(conn, e, obj["uid"] if "uid" in obj else None)
-                continue
             continue
         return
 
