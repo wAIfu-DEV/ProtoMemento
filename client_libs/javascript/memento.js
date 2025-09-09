@@ -6,7 +6,7 @@ const fs = require("fs");
 const { ChildProcess, spawn } = require("child_process");
 const { randomUUID } = require("crypto");
 
-/** @typedef {{id: string, content: string, time: number, user: string? | undefined, score: number? | undefined, lifetime: number? | undefined}} MemObj */
+/** @typedef {{id: string, content: string, time: number, user?: string?, score?: number?, lifetime?: number?}} MemObj */
 /** @typedef {{memory: MemObj, dictance: number}} QueriedMemObj */
 
 class Memory {
@@ -14,13 +14,13 @@ class Memory {
     /** @type {string} */ content;
     /** @type {number} */ time;
 
-    /** @type {string? | undefined} */ user;
-    /** @type {number? | undefined} */ score;
-    /** @type {number? | undefined} */ lifetime;
+    /** @type {string?} */ user = null;
+    /** @type {number?} */ score = null;
+    /** @type {number?} */ lifetime = null;
 
     /**
      *
-     * @param {MemObj? | undefined} params
+     * @param {MemObj?} params
      */
     constructor(params = null) {
         if (params) {
@@ -63,7 +63,7 @@ class QueriedMemory {
 
     /**
      *
-     * @param {QueriedMemObj? | undefined} params
+     * @param {QueriedMemObj?} params
      */
     constructor(params = null) {
         if (params) {
@@ -190,7 +190,7 @@ class WSWrapper {
     }
 }
 
-exports.Memento = class Memento {
+class Memento {
     /** @private @type {URL} */ _url;
     /** @private @type {WSWrapper?} */ _conn;
     /** @private @type {ChildProcess} */ _proc;
@@ -208,12 +208,12 @@ exports.Memento = class Memento {
     }
 
     /**
+     * @private
      * @param {number} port
      * @param {string} host
-     * @param {number} timeoutMs
-     * @returns {Promise}
+     * @returns {Promise<boolean>}
      */
-    isPortOpen(port, host, timeoutMs = 2_000) {
+    checkPortAliveOnce(port, host) {
         return new Promise((resolve) => {
             const socket = new net.Socket();
 
@@ -237,6 +237,36 @@ exports.Memento = class Memento {
         });
     }
 
+    /**
+     * @private
+     * @param {number} port
+     * @param {string} host
+     * @param {number} timeoutMs
+     * @returns {Promise<boolean>}
+     */
+    isPortOpen(port, host, timeoutMs = 2_000) {
+        return new Promise(async (resolve) => {
+            let resolved = false;
+
+            let resolver = (val) => {
+                resolved = true;
+                resolve(val);
+            };
+
+            setTimeout(() => {
+                resolver(false);
+            }, timeoutMs);
+
+            while (!resolved) {
+                let open = await this.checkPortAliveOnce(port, host);
+                if (open) resolver(true);
+            }
+        });
+    }
+
+    /**
+     * @returns {Promise<void>}
+     */
     async connect() {
         let isConnected = await this.isPortOpen(
             this._url.port,
@@ -250,8 +280,13 @@ exports.Memento = class Memento {
                 );
             }
 
-            pyPath = path.join(this._abs_dir, "venv", "Scripts", "python.exe");
-            mainPath = path.join(this._abs_dir, "main.py");
+            let pyPath = path.join(
+                this._abs_dir,
+                "venv",
+                "Scripts",
+                "python.exe"
+            );
+            let mainPath = path.join(this._abs_dir, "main.py");
 
             if (!fs.existsSync(pyPath) || !fs.existsSync(mainPath)) {
                 throw new Error(
@@ -259,9 +294,7 @@ exports.Memento = class Memento {
                 );
             }
 
-            this._proc = spawn(pyPath, [mainPath], {
-                cwd: this._abs_dir,
-            });
+            this._proc = spawn(pyPath, [mainPath], { cwd: this._abs_dir });
             process.once("exit", () => {
                 this._proc.kill(2);
             });
@@ -350,7 +383,7 @@ exports.Memento = class Memento {
     ) {
         let reqId = randomUUID();
 
-        let resolver = undefined;
+        let resolver;
         let promise = new Promise((resolve) => {
             resolver = resolve;
         });
@@ -381,4 +414,5 @@ exports.Memento = class Memento {
         }
         return result;
     }
-};
+}
+exports.Memento = Memento;
