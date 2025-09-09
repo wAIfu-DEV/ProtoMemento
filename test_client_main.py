@@ -102,7 +102,7 @@ async def main():
                 await client.process(
                     collection_name=ai_name,
                     context=context,
-                    messages=[OpenLlmMsg(x) for x in messages["convo"]],
+                    messages=[OpenLlmMsg(**x) for x in messages["convo"]],
                 )
             
             case "count":

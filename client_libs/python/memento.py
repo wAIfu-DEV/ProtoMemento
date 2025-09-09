@@ -163,11 +163,14 @@ class Memento:
     
 
     def __del__(self):
-        if self._proc != None:
+        if self._proc != None and self._proc.returncode == None:
             self._proc.kill()
         
-        if self._conn != None:
-            self._conn.close()
+        if self._conn != None and self._conn.close_code == None:
+            if self._loop.is_running():
+                self._loop.create_task(self._conn.close())
+            else:
+                asyncio.run(self._conn.close())
     
 
     def _is_port_open(self, host: str, port: int, timeout: float = 2.0) -> bool:
@@ -210,8 +213,6 @@ class Memento:
                     case "query":
                         res = QueryResult()
                         dbs: list[str] = obj["from"]
-
-                        print(obj)
                         
                         if "stm" in dbs:
                             res.short_term = [QueriedMemory.from_dict(x) for x in obj["stm"]]

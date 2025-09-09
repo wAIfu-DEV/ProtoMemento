@@ -29,14 +29,6 @@ class Memory {
     }
 
     /**
-     * @param {Record<string,any>} input
-     * @returns {Memory}
-     */
-    static fromRecord(input) {
-        return new Memory(input);
-    }
-
-    /**
      * @returns {MemObj}
      */
     toRecord() {
@@ -69,14 +61,6 @@ class QueriedMemory {
         if (params) {
             Object.assign(this, params);
         }
-    }
-
-    /**
-     * @param {QueriedMemObj} input
-     * @returns
-     */
-    static fromRecord(input) {
-        return new QueriedMemory(input);
     }
 
     toRecord() {
@@ -344,15 +328,15 @@ class Memento {
 
                 if ("stm" in dbs)
                     for (let x of obj["stm"])
-                        res.shortTerm.push(QueriedMemory.fromRecord(x));
+                        res.shortTerm.push(new QueriedMemory(x));
 
                 if ("ltm" in dbs)
                     for (let x of obj["ltm"])
-                        res.longTerm.push(QueriedMemory.fromRecord(x));
+                        res.longTerm.push(new QueriedMemory(x));
 
                 if ("users" in dbs)
                     for (let x of obj["users"])
-                        res.users.push(Memory.fromRecord(x));
+                        res.users.push(new Memory(x));
 
                 if (msgId in this._resolvers) {
                     let resolver = this._resolvers[msgId];
