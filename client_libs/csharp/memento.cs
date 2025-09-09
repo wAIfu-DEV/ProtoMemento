@@ -86,7 +86,6 @@ namespace ProtoMemento
         private Task? _recvLoop;
 
         private readonly ConcurrentDictionary<string, TaskCompletionSource<QueryResult>> _pendingQueries = new();
-        private readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> _pendingAcks = new();
         private readonly SemaphoreSlim _sendLock = new(1, 1);
 
         public event Action<string>? SummaryReceived;
@@ -94,7 +93,7 @@ namespace ProtoMemento
         public MementoClient(string host = "127.0.0.1", int port = 4286, bool secure = false)
         {
             _uri = new Uri($"{(secure ? "wss" : "ws")}://{host}:{port}");
-            _ws.Options.KeepAliveInterval = Timeout.InfiniteTimeSpan;
+            _ws.Options.KeepAliveInterval = Timeout.Zero;
         }
 
         public async Task ConnectAsync(CancellationToken ct = default)
@@ -166,6 +165,17 @@ namespace ProtoMemento
                 from = MapDbEnums(from),
                 n
             };
+			
+			try
+			{
+				await SendAsync(payload, ct).ConfigureAwait(false);
+			}
+			catch
+			{
+				_pendingQueries.TryRemove(uid, out _);
+				throw;
+			}
+			
             await SendAsync(payload, ct).ConfigureAwait(false);
 
             using var lcts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, ct);
