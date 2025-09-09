@@ -5,6 +5,6 @@ SET PY_PATH=py
 SET CWD=%~dp0
 
 ECHO Running...
-CALL %CWD%/venv/Scripts/python.exe example_client/client_main.py
+CALL %CWD%/venv/Scripts/python.exe test_client_main.py
 
 PAUSE

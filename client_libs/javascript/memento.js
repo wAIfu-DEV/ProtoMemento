@@ -203,7 +203,7 @@ exports.Memento = class Memento {
      */
     constructor(params = { abs_dir: null, host: "127.0.0.1", port: 4286 }) {
         this._conn = null;
-        this._url = new URL(`wss://${params.host}:${params.port.toString()}`);
+        this._url = new URL(`ws://${params.host}:${params.port.toString()}`);
         this._abs_dir = params.abs_dir;
     }
 

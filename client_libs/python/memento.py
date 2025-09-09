@@ -5,11 +5,13 @@ import os
 import socket
 import subprocess
 import json
+import time
 import uuid
 
 from typing import Callable, Literal
 from enum import Enum
 
+import websockets.sync.client
 from websockets.asyncio.client import ClientConnection, connect
 
 from typing import Optional, Self
@@ -32,7 +34,7 @@ class Memory(BaseModel):
     @staticmethod
     def from_dict(input: dict)-> Self:
         return Memory(
-            id=input.get("id", uuid.uuid4()),
+            id=input.get("id", str(uuid.uuid4())),
             content=input.get("content", ""),
             time=input.get("time", 0),
             user=input.get("user", None),
@@ -65,10 +67,10 @@ class QueriedMemory(BaseModel):
     
     @staticmethod
     def from_dict(input: dict)-> Self:
-        mem: dict | None = input.get("memory", None),
+        mem: dict = input.get("memory", None)
         return QueriedMemory(
             memory=Memory(
-                id=mem.get("id", uuid.uuid4()),
+                id=mem.get("id", str(uuid.uuid4())),
                 content=mem.get("content", ""),
                 time=mem.get("time", 0),
                 user=mem.get("user", None),
@@ -108,10 +110,19 @@ class QueryResult:
     long_term: list[QueriedMemory]
     users: list[Memory]
 
+    def __init__(self):
+        self.short_term = []
+        self.long_term = []
+        self.users = []
+
 
 class CountResult:
     short_term: int
     long_term: int
+
+    def __init__(self):
+        self.short_term = 0
+        self.long_term = 0
 
 
 class Memento:
@@ -125,7 +136,7 @@ class Memento:
 
     def __init__(self, abs_dir: str = "", host: str = "127.0.0.1", port: int = 4286, loop=None):
         self._conn = None
-        self._uri = f"wss://{host}:{str(port)}"
+        self._uri = f"ws://{host}:{str(port)}"
 
         self._proc = None
         if not self._is_port_open(host, port, timeout=2.0):
@@ -138,13 +149,17 @@ class Memento:
             if not os.path.isfile(py_path) or not os.path.isfile(main_path):
                 raise Exception("abs_dir provided does not point to a valid Memento directory.")
 
-            self._proc = subprocess.Popen([py_path, main_path], cwd=abs_dir)
+            self._proc = subprocess.Popen([py_path, main_path], cwd=abs_dir, creationflags=subprocess.CREATE_NEW_CONSOLE)
 
             if not self._is_port_open(host, port, timeout=10.0):
-                raise Exception("failed to run new Memento instance.")
+                self._proc.kill()
+                self._proc.wait(5.0)
+                stdout = self._proc.stdout
+                stderr = self._proc.stderr
+                raise Exception("failed to run new Memento instance.", "stdout: " + stdout.read() if stdout else "", "stderr: " + stderr.read() if stderr else "")
 
         self._loop = loop or asyncio.get_event_loop()
-        self._ws_task = self.loop.create_task(self._runner())
+        self._ws_task = self._loop.create_task(self._runner())
     
 
     def __del__(self):
@@ -155,12 +170,16 @@ class Memento:
             self._conn.close()
     
 
-    def _is_port_open(host: str, port: int, timeout: float = 2.0) -> bool:
-        try:
-            with socket.create_connection((host, port), timeout=timeout):
-                return True
-        except (socket.timeout, ConnectionRefusedError, OSError):
-            return False
+    def _is_port_open(self, host: str, port: int, timeout: float = 2.0) -> bool:
+        start_time = time.time()
+        while (time.time() - start_time) < timeout:
+            try:
+                with websockets.sync.client.connect(uri=self._uri, open_timeout=timeout):
+                    return True
+            except:
+                time.sleep(timeout / 4.0)
+                continue
+        return False
     
     
     async def _runner(self):
@@ -191,6 +210,8 @@ class Memento:
                     case "query":
                         res = QueryResult()
                         dbs: list[str] = obj["from"]
+
+                        print(obj)
                         
                         if "stm" in dbs:
                             res.short_term = [QueriedMemory.from_dict(x) for x in obj["stm"]]
@@ -238,7 +259,7 @@ class Memento:
             query_str: str,
             collection_name: str = "default",
             user: str | None = None,
-            _from: list[DbEnum] = [DbEnum.SHORT_TERM, DbEnum.LONG_TERM, DbEnum.USERS],
+            from_: list[DbEnum] = [DbEnum.SHORT_TERM, DbEnum.LONG_TERM, DbEnum.USERS],
             n: list[int] = [1, 1, 1],
             timeout: float = 5.0,
         )-> QueryResult:
@@ -254,14 +275,14 @@ class Memento:
                 "query": query_str,
                 "ai_name": collection_name,
                 "user": user,
-                "from": [x.value for x in _from],
+                "from": [x.value for x in from_],
                 "n": n,
             }),
             text=True,
         )
 
         try:
-            async with asyncio.timeout(timeout):
+            async with asyncio.timeout(timeout) as t:
                 return await future
         except asyncio.TimeoutError as e:
             future.set_result(None)
@@ -328,7 +349,8 @@ class Memento:
     
     async def clear(self,
             collection_name: str = "default",
-            target: list[DbEnum] = [DbEnum.SHORT_TERM, DbEnum.LONG_TERM, DbEnum.USERS],
+            user: str | None = None,
+            target: DbEnum = DbEnum.SHORT_TERM,
         )-> None:
 
         await self._conn.send(
@@ -336,14 +358,15 @@ class Memento:
                 "uid": str(uuid.uuid4()),
                 "type": "clear",
                 "ai_name": collection_name,
-                "target": [x.value for x in target],
+                "target": target.value,
+                "user": user,
             }),
             text=True,
         )
     
     async def count(self,
             collection_name: str = "default",
-            _from: list[DbEnum] = [DbEnum.SHORT_TERM, DbEnum.LONG_TERM, DbEnum.USERS],
+            from_: list[DbEnum] = [DbEnum.SHORT_TERM, DbEnum.LONG_TERM, DbEnum.USERS],
             timeout: float = 5.0,
         )-> None:
 
@@ -356,7 +379,7 @@ class Memento:
                 "uid": req_id,
                 "type": "count",
                 "ai_name": collection_name,
-                "from": [x.value for x in _from],
+                "from": [x.value for x in from_],
             }),
             text=True,
         )
