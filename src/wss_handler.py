@@ -6,7 +6,6 @@ import time
 import traceback
 import uuid
 import logging
-import asyncio
 
 from typing import Callable, Coroutine
 
@@ -345,7 +344,7 @@ class WssHandler:
             self._logger.info("on_evict_chunk: queued for async compression (size=%d)", self._compress_q.qsize())
         except asyncio.QueueFull:
             self._logger.warning("compress queue full; running this chunk off-thread immediately")
-            asyncio.create_task(asyncio.to_thread(self.compressor.compress_batch_async, coll_name, mems))
+            asyncio.create_task(self.compressor.compress_batch_async(coll_name, mems))
 
 
     async def _on_clear(self, conn: ServerConnection, obj: dict) -> None:
