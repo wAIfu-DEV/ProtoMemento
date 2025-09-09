@@ -43,6 +43,8 @@ class WssHandler:
         self._config = config
         self._env = env
         
+        self._bg_tasks: set[asyncio.Task] = set()
+        
         self._dbs = database_bundle
         self._handlers = {
             "query": self._on_query,
@@ -83,7 +85,10 @@ class WssHandler:
     async def _send(self, conn: ServerConnection, data: dict)-> None:
         try:
             json_data = json.dumps(data)
-            await conn.send(json_data, text=True)
+            if not hasattr(conn, "_send_lock"):
+                conn._send_lock = asyncio.Lock()
+            async with conn._send_lock:
+                await conn.send(json_data, text=True)
             
             self._logger.info("recv->send latency: %d", int(time.time() * 1_000) - self._recv_time)
             self._logger.info("sent: %s", json_data)
@@ -127,6 +132,11 @@ class WssHandler:
                 # the app close by itself, which is massive.
                 # Would prevent addr already used errs
                 self._logger.info("connection closed on recv.")
+                if hasattr(conn, "_send_lock"):
+                    del conn._send_lock
+                for t in list(self._bg_tasks):
+                    t.cancel()
+                self._bg_tasks.clear()
                 return
 
             self._recv_time = int(time.time() * 1_000)
@@ -155,6 +165,35 @@ class WssHandler:
             msg_handler = self._handlers.get(msg_type, self._on_unhandled)
 
             try:
+                # prevent long ops from blocking the recv loop
+                if msg_type in ("process", "evict"):
+                    async def _runner():
+                        try:
+                            await msg_handler(conn, obj)
+                        except ConnectionClosed:
+                            self._logger.info("connection closed during %s", msg_type)
+                        except Exception as e:
+                            uid = obj["uid"] if "uid" in obj else None
+                            try:
+                                await self._send_error(conn, e, uid)
+                            except Exception:
+                                self._logger.exception("failed to send error for background task")
+
+                    t = asyncio.create_task(_runner())
+                    self._bg_tasks.add(t)
+                    t.add_done_callback(lambda _t: self._bg_tasks.discard(_t))
+                    continue
+
+                await msg_handler(conn, obj)
+
+            except ConnectionClosed:
+                self._logger.info("connection closed on send.")
+                return
+            except Exception as e:
+                await self._send_error(conn, e, obj["uid"] if "uid" in obj else None)
+                continue
+
+            try:
                 await msg_handler(conn, obj)
             except ConnectionClosed:
                 self._logger.info("connection closed on send.")
@@ -163,7 +202,6 @@ class WssHandler:
                 await self._send_error(conn, e, obj["uid"] if "uid" in obj else None)
                 continue
             continue
-        
         return
 
 
@@ -346,6 +384,11 @@ class WssHandler:
         self._logger.info("received close message.")
         self._compress_worker_task.cancel()
         self._close_server.set_result(None)
+        if hasattr(conn, "_send_lock"):
+            del conn._send_lock
+        for t in list(self._bg_tasks):
+            t.cancel()
+        self._bg_tasks.clear()
         return
         
         
