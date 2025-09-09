@@ -7,7 +7,7 @@ import uuid
 from client_libs.python.memento import Memento, DbEnum, Memory, OpenLlmMsg
 
 message_types = ["store", "query", "evict", "process", "close"]
-msg_type_inp_question = f"\nmsg type ({", ".join(message_types)}): "
+msg_type_inp_question = f"\nmsg type ({', '.join(message_types)}): "
 
 
 # needed since standard input blocks thread and leads to ping timeout
