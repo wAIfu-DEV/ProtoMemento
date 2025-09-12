@@ -7,7 +7,9 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
+	"sync"
 	"time"
 
 	websocket "github.com/gorilla/websocket"
@@ -19,8 +21,8 @@ type Memory struct {
 	time    int64
 
 	user     *string
-	score    *float32
-	lifetime *int32
+	score    *float64
+	lifetime *int64
 }
 
 func (m *Memory) SetFromMap(obj map[string]any) error {
@@ -31,18 +33,21 @@ func (m *Memory) SetFromMap(obj map[string]any) error {
 	if m.content, ok = obj["content"].(string); !ok {
 		return errors.New("missing field \"content\" from received memory object")
 	}
-	if m.time, ok = obj["time"].(int64); !ok {
+	if fltTime, ok := obj["time"].(float64); ok {
+		m.time = int64(math.Round(fltTime))
+	} else {
 		return errors.New("missing field \"time\" from received memory object")
 	}
 
 	if maybeUser, ok := obj["user"].(string); ok {
 		m.user = &maybeUser
 	}
-	if maybeScore, ok := obj["score"].(float32); ok {
+	if maybeScore, ok := obj["score"].(float64); ok {
 		m.score = &maybeScore
 	}
-	if maybeLifetime, ok := obj["lifetime"].(int32); ok {
-		m.lifetime = &maybeLifetime
+	if maybeLifetime, ok := obj["lifetime"].(float64); ok {
+		iVal := int64(math.Round(maybeLifetime))
+		m.lifetime = &iVal
 	}
 	return nil
 }
@@ -68,7 +73,7 @@ func (m *Memory) ToMap() map[string]any {
 
 type QueriedMemory struct {
 	memory   Memory
-	distance float32
+	distance float64
 }
 
 func (q *QueriedMemory) SetFromMap(m map[string]any) error {
@@ -80,7 +85,7 @@ func (q *QueriedMemory) SetFromMap(m map[string]any) error {
 	if err != nil {
 		return err
 	}
-	if q.distance, ok = m["distance"].(float32); !ok {
+	if q.distance, ok = m["distance"].(float64); !ok {
 		return errors.New("missing field \"distance\" from received queried memory object")
 	}
 	return nil
@@ -121,21 +126,30 @@ type CountResult struct {
 	LtmCount *int64
 }
 
+type genericResult[T any] struct {
+	Result T
+	Err    error
+}
+
 type messageHandlers struct {
-	query map[string]chan QueryResult
-	count map[string]chan CountResult
+	query map[string]chan genericResult[QueryResult]
+	count map[string]chan genericResult[CountResult]
 }
 
 type Client struct {
-	conn     *websocket.Conn
-	url      url.URL
-	errChan  chan error
-	done     chan bool
-	handlers messageHandlers
+	conn      *websocket.Conn
+	url       url.URL
+	handlers  messageHandlers
+	mutex     sync.Mutex
+	connected bool
 }
 
 func (c *Client) Disconnect(timeout time.Duration) {
 	if c.conn != nil {
+		c.mutex.Lock()
+		c.connected = false
+		c.mutex.Unlock()
+
 		c.conn.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(timeout))
 		c.conn.Close()
 	}
@@ -144,105 +158,128 @@ func (c *Client) Disconnect(timeout time.Duration) {
 func (c *Client) handleMessage(jsonMsg map[string]any, msgType string, msgId string) {
 	switch msgType {
 	case "query":
-		msgHandler, ok := c.handlers.query[msgId]
-		if !ok {
-			c.errChan <- errors.New("missing handler for query response")
-			return
+
+		var msgHandler chan genericResult[QueryResult]
+		{ // MUTEX CTX =========================================================
+			c.mutex.Lock()
+			defer c.mutex.Unlock()
+
+			var ok bool
+			msgHandler, ok = c.handlers.query[msgId]
+			if !ok {
+				fmt.Println("memento error: missing handler for query response")
+				return
+			}
+			delete(c.handlers.query, msgId)
 		}
+
 		res := QueryResult{}
 
-		if maybeStm, ok := jsonMsg["stm"].([]map[string]any); ok {
+		if maybeStm, ok := jsonMsg["stm"].([]any); ok {
 			for _, ent := range maybeStm {
 				qm := QueriedMemory{}
-				err := qm.SetFromMap(ent)
+				err := qm.SetFromMap(ent.(map[string]any))
 				if err != nil {
-					c.errChan <- err
+					msgHandler <- genericResult[QueryResult]{Err: err}
 					goto switch_query_end
 				}
 				res.Stm = append(res.Stm, qm)
 			}
 		}
 
-		if maybeLtm, ok := jsonMsg["ltm"].([]map[string]any); ok {
+		if maybeLtm, ok := jsonMsg["ltm"].([]any); ok {
 			for _, ent := range maybeLtm {
 				qm := QueriedMemory{}
-				err := qm.SetFromMap(ent)
+				err := qm.SetFromMap(ent.(map[string]any))
 				if err != nil {
-					c.errChan <- err
+					msgHandler <- genericResult[QueryResult]{Err: err}
 					goto switch_query_end
 				}
 				res.Ltm = append(res.Ltm, qm)
 			}
 		}
 
-		if maybeUsers, ok := jsonMsg["users"].([]map[string]any); ok {
+		if maybeUsers, ok := jsonMsg["users"].([]any); ok {
 			for _, ent := range maybeUsers {
 				m := Memory{}
-				err := m.SetFromMap(ent)
+				err := m.SetFromMap(ent.(map[string]any))
 				if err != nil {
-					c.errChan <- err
+					msgHandler <- genericResult[QueryResult]{Err: err}
 					goto switch_query_end
 				}
 				res.User = append(res.User, m)
 			}
 		}
 
-		msgHandler <- res // deliver result
+		msgHandler <- genericResult[QueryResult]{Result: res} // deliver result
 
 	switch_query_end: // cleanup
 		close(msgHandler)
-		delete(c.handlers.query, msgId)
 		return
 	case "count":
-		msgHandler, ok := c.handlers.count[msgId]
-		if !ok {
-			c.errChan <- errors.New("missing handler for count response")
-			return
+
+		var msgHandler chan genericResult[CountResult]
+		{ // MUTEX CTX =========================================================
+			c.mutex.Lock()
+			defer c.mutex.Unlock()
+
+			var ok bool
+			msgHandler, ok = c.handlers.count[msgId]
+			if !ok {
+				fmt.Println("memento error: missing handler for count response")
+				return
+			}
+			delete(c.handlers.count, msgId)
 		}
+
 		res := CountResult{}
 
-		if maybeStm, ok := jsonMsg["stm"].(int64); ok {
-			res.StmCount = &maybeStm
+		if maybeStm, ok := jsonMsg["stm"].(float64); ok {
+			val := int64(math.Round(maybeStm))
+			res.StmCount = &val
 		}
 
-		if maybeLtm, ok := jsonMsg["ltm"].(int64); ok {
-			res.LtmCount = &maybeLtm
+		if maybeLtm, ok := jsonMsg["ltm"].(float64); ok {
+			val := int64(math.Round(maybeLtm))
+			res.LtmCount = &val
 		}
 
-		msgHandler <- res // deliver result
+		msgHandler <- genericResult[CountResult]{Result: res} // deliver result
 
 		// cleanup
 		close(msgHandler)
-		delete(c.handlers.count, msgId)
 		return
 	}
 }
 
 func (c *Client) recvLoop() {
-	defer close(c.done)
-	defer close(c.errChan)
-
 	for {
 		var jsonMsg map[string]any
 		err := c.conn.ReadJSON(&jsonMsg)
 		if err != nil {
-			c.errChan <- err
-			maybeCloseErr := &websocket.CloseError{}
-			if errors.As(err, &maybeCloseErr) {
+			closeErr := &websocket.CloseError{}
+			if errors.As(err, &closeErr) {
+				c.mutex.Lock()
+				c.connected = false
+				c.mutex.Unlock()
+
+				fmt.Printf("mement: connection closed with code: %d and message: %s", closeErr.Code, closeErr.Text)
 				return // quit goroutine
 			}
+
+			fmt.Printf("memento error on recv: %s\n", err.Error())
 			continue
 		}
 
 		msgType, ok := jsonMsg["type"].(string)
 		if !ok {
-			c.errChan <- errors.New("missing field \"type\" in json message")
+			fmt.Println("memento error: missing field \"type\" in received json message")
 			continue
 		}
 
 		msgId, ok := jsonMsg["uid"].(string)
 		if !ok {
-			c.errChan <- errors.New("missing field \"uid\" in json message")
+			fmt.Println("memento error: missing field \"uid\" in received json message")
 			continue
 		}
 
@@ -255,9 +292,11 @@ func NewClient(host string, port int) (*Client, error) {
 	c.url = url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", host, port)}
 
 	c.handlers = messageHandlers{
-		query: map[string]chan QueryResult{},
-		count: map[string]chan CountResult{},
+		query: map[string]chan genericResult[QueryResult]{},
+		count: map[string]chan genericResult[CountResult]{},
 	}
+
+	c.mutex = sync.Mutex{}
 
 	conn, _, err := websocket.DefaultDialer.Dial(c.url.String(), nil)
 	if err != nil {
@@ -265,8 +304,7 @@ func NewClient(host string, port int) (*Client, error) {
 	}
 
 	c.conn = conn
-	c.done = make(chan bool, 1)
-	c.errChan = make(chan error)
+	c.connected = true
 
 	go c.recvLoop() // recv handler
 
@@ -287,6 +325,12 @@ func (c *Client) generateUid() string {
 	return base64.StdEncoding.EncodeToString(randBytes)
 }
 
+func (c *Client) isConnDead() bool {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	return !c.connected
+}
+
 func (c *Client) Query(
 	queryStr string,
 	collectionName string,
@@ -297,11 +341,19 @@ func (c *Client) Query(
 ) (QueryResult, error) {
 
 	var zero QueryResult
+	var retErr error
+
+	if c.isConnDead() {
+		return zero, errors.New("memento: client not connected")
+	}
 
 	uniqueId := c.generateUid()
 
-	resultChan := make(chan QueryResult)
+	resultChan := make(chan genericResult[QueryResult], 1)
+
+	c.mutex.Lock() //===========================================================
 	c.handlers.query[uniqueId] = resultChan
+	c.mutex.Unlock() //=========================================================
 
 	data := map[string]any{
 		"uid":     uniqueId,
@@ -318,15 +370,26 @@ func (c *Client) Query(
 
 	err := c.conn.WriteJSON(data)
 	if err != nil {
-		return zero, err
+		retErr = err
+		goto end_with_cleanup
 	}
 
 	select {
 	case qRes := <-resultChan:
-		return qRes, nil
+		return qRes.Result, qRes.Err
 	case <-time.After(timeout):
-		return zero, errors.New("timeout")
+		retErr = errors.New("timeout")
+		goto end_with_cleanup
 	}
+
+end_with_cleanup:
+	c.mutex.Lock() //===========================================================
+	if ch, exists := c.handlers.query[uniqueId]; exists {
+		delete(c.handlers.query, uniqueId)
+		close(ch) // Safe to close since we still own it
+	}
+	c.mutex.Unlock() //=========================================================
+	return zero, retErr
 }
 
 func (c *Client) Count(
@@ -336,11 +399,19 @@ func (c *Client) Count(
 ) (CountResult, error) {
 
 	var zero CountResult
+	var retErr error
+
+	if c.isConnDead() {
+		return zero, errors.New("memento: client not connected")
+	}
 
 	uniqueId := c.generateUid()
 
-	resultChan := make(chan CountResult)
+	resultChan := make(chan genericResult[CountResult], 1)
+
+	c.mutex.Lock() //===========================================================
 	c.handlers.count[uniqueId] = resultChan
+	c.mutex.Unlock() //=========================================================
 
 	err := c.conn.WriteJSON(map[string]any{
 		"uid":     uniqueId,
@@ -349,15 +420,26 @@ func (c *Client) Count(
 		"from":    fromDb,
 	})
 	if err != nil {
-		return zero, err
+		retErr = err
+		goto end_with_cleanup
 	}
 
 	select {
 	case cRes := <-resultChan:
-		return cRes, nil
+		return cRes.Result, cRes.Err
 	case <-time.After(timeout):
-		return zero, errors.New("timeout")
+		retErr = errors.New("timeout")
+		goto end_with_cleanup
 	}
+
+end_with_cleanup:
+	c.mutex.Lock() //===========================================================
+	if ch, exists := c.handlers.count[uniqueId]; exists {
+		delete(c.handlers.count, uniqueId)
+		close(ch) // Safe to close since we still own it
+	}
+	c.mutex.Unlock() //=========================================================
+	return zero, retErr
 }
 
 func (c *Client) Store(
@@ -365,6 +447,10 @@ func (c *Client) Store(
 	collectionName string,
 	to []DbEnum,
 ) error {
+	if c.isConnDead() {
+		return errors.New("memento: client not connected")
+	}
+
 	mems := []map[string]any{}
 	for _, mem := range memories {
 		mems = append(mems, mem.ToMap())
@@ -384,14 +470,18 @@ func (c *Client) Process(
 	context []OpenLlmMessage,
 	collectionName string,
 ) error {
+	if c.isConnDead() {
+		return errors.New("memento: client not connected")
+	}
+
 	msgMaps := make([]map[string]any, len(messages))
-	for _, msg := range messages {
-		msgMaps = append(msgMaps, msg.ToMap())
+	for i, msg := range messages {
+		msgMaps[i] = msg.ToMap()
 	}
 
 	ctxMaps := make([]map[string]any, len(context))
-	for _, msg := range context {
-		ctxMaps = append(ctxMaps, msg.ToMap())
+	for i, msg := range context {
+		ctxMaps[i] = msg.ToMap()
 	}
 
 	return c.conn.WriteJSON(map[string]any{
@@ -404,6 +494,10 @@ func (c *Client) Process(
 }
 
 func (c *Client) CloseBackend() error {
+	if c.isConnDead() {
+		return errors.New("memento: client not connected")
+	}
+
 	return c.conn.WriteJSON(map[string]any{
 		"uid":  c.generateUid(),
 		"type": "close",
@@ -411,6 +505,10 @@ func (c *Client) CloseBackend() error {
 }
 
 func (c *Client) Evict(collectionName string) error {
+	if c.isConnDead() {
+		return errors.New("memento: client not connected")
+	}
+
 	return c.conn.WriteJSON(map[string]any{
 		"uid":     c.generateUid(),
 		"type":    "evict",
@@ -423,6 +521,10 @@ func (c *Client) Clear(
 	user *string,
 	target []DbEnum,
 ) error {
+	if c.isConnDead() {
+		return errors.New("memento: client not connected")
+	}
+
 	data := map[string]any{
 		"uid":     c.generateUid(),
 		"type":    "clear",
