@@ -25,7 +25,7 @@ async def main():
     logger.info("available onnxruntime providers: %s", ", ".join(onnxruntime.get_available_providers()))
 
     logger.info("reading config & env")
-    env = parse_env()
+    env =    parse_env()
     conf = parse_config()
 
     #generate_schemas() # generate schemas for inbound Ws messages

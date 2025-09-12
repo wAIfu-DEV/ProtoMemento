@@ -8,6 +8,7 @@ const { randomUUID } = require("crypto");
 
 /** @typedef {{id: string, content: string, time: number, user?: string?, score?: number?, lifetime?: number?}} MemObj */
 /** @typedef {{memory: MemObj, dictance: number}} QueriedMemObj */
+/** @typedef {{role: "user" | "assistant" | "system" | string, content: string, name?: string}} OpenLlmMessage */
 
 class Memory {
     /** @type {string} */ id;
@@ -379,10 +380,10 @@ class Memento {
                 uid: reqId,
                 type: "query",
                 query: queryStr,
-                ai_name: collectionName,
-                user: user,
-                from: from,
-                n: n,
+                ai_name: params.collectionName,
+                user: params.user,
+                from: params.from,
+                n: params.n,
             })
         );
 
@@ -397,6 +398,138 @@ class Memento {
             throw new Error("timeout");
         }
         return result;
+    }
+
+    /**
+     * @param { Memory[] } memories 
+     * @param params 
+     */
+    store(memories, params = {
+        collectionName: "default",
+        to: ["stm", "users"],
+    }) {
+        let memobjs = []
+        for (let mem of memories) {
+            memobjs.push(mem.toRecord())
+        }
+
+        this._conn.send(
+            JSON.stringify({
+                uid: randomUUID(),
+                type: "store",
+                memories: memobjs,
+                ai_name: params.collectionName,
+                to: params.to,
+            })
+        );
+    }
+
+    /**
+     * @param { OpenLlmMessage[] } messages 
+     * @param params
+     */
+    process(messages, params = {
+        /** @type {OpenLlmMessage[]} */
+        context: [],
+        collectionName: "default",
+    }) {
+        this._conn.send(
+            JSON.stringify({
+                uid: randomUUID(),
+                type: "process",
+                messages: messages,
+                context: params.context,
+                ai_name: params.collectionName,
+            })
+        );
+    }
+
+    close() {
+        this._conn.send(
+            JSON.stringify({
+                uid: randomUUID(),
+                type: "close",
+            })
+        );
+    }
+
+    /**
+     * @param {string} collectionName 
+     */
+    evict(collectionName = "default") {
+        this._conn.send(
+            JSON.stringify({
+                uid: randomUUID(),
+                type: "evict",
+                ai_name: collectionName
+            })
+        );
+    }
+
+    clear(params = {
+        collectionName: "default",
+        /** @type {string | null} */
+        user: null,
+        target: "stm",
+    }) {
+        this._conn.send(
+            JSON.stringify({
+                uid: randomUUID(),
+                type: "clear",
+                ai_name: params.collectionName,
+                target: params.target,
+                user: params.user,
+            })
+        );
+    }
+
+    /**
+     * 
+     * @param params 
+     * @returns {Promise<{stm?: number, ltm?: number}>}
+     */
+    async count(params = {
+        collectionName: "default",
+        from: ["stm", "ltm"],
+        timeoutMs: 5_000,
+    }) {
+        let reqId = randomUUID();
+
+        let resolver;
+        let promise = new Promise((resolve) => {
+            resolver = resolve;
+        });
+
+        this._resolvers[reqId] = resolver;
+
+        this._conn.send(
+            JSON.stringify({
+                uid: reqId,
+                type: "count",
+                ai_name: params.collectionName,
+                from: params.from,
+            })
+        );
+
+        let timeoutPromise = new Promise((resolve) =>
+            setTimeout(resolve, params.timeoutMs)
+        );
+        let result = await Promise.race([timeoutPromise, promise]);
+
+        delete this._resolvers[reqId];
+
+        if (result === undefined) {
+            throw new Error("timeout");
+        }
+
+        let ret = {}
+        if ("stm" in result) {
+            ret["stm"] = result["stm"]
+        }
+        if ("ltm" in result) {
+            ret["ltm"] = result["ltm"]
+        }
+        return ret;
     }
 }
 exports.Memento = Memento;
