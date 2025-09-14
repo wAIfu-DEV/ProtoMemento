@@ -8,6 +8,8 @@ from typing import List, Optional
 from src.config import Config
 from src.messages import OpenLlmMsg
 
+from src.retry_and_timeout import with_retry_and_timeout_async
+
 
 class RememberEntry(BaseModel):
     text: str = Field(..., max_length=1000)
@@ -79,16 +81,25 @@ class AI:
             "content": f"{ process_prompt }{ msg_str.strip() }",
         }
 
-        completion = await self.client.beta.chat.completions.parse(
+        maybe_completion = await with_retry_and_timeout_async(
+            cr=self.client.beta.chat.completions.parse,
             model=self.model_name,
             messages=[*context, prompt_msg],
             temperature=self.config.openllm.temp,
             max_completion_tokens=self.config.openllm.max_completion_tokens,
             response_format=ProcessResult,
+            timeout=65.0,
+
+            max_retries=5,
+            timeout_each=60.0,
         )
-        parsed = completion.choices[0].message.parsed
+
+        if maybe_completion is None:
+            raise Exception("failed to process memories due to ai backend failure. data loss occured.")
+            
+
+        parsed = maybe_completion.choices[0].message.parsed
 
         self.logger.info("process result: %s", parsed.model_dump_json(indent=4))
-
         return parsed
         

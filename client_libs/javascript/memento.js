@@ -6,34 +6,27 @@ const fs = require("fs");
 const { ChildProcess, spawn } = require("child_process");
 const { randomUUID } = require("crypto");
 
-/** @typedef {{id: string, content: string, time: number, user: string? | undefined, score: number? | undefined, lifetime: number? | undefined}} MemObj */
+/** @typedef {{id: string, content: string, time: number, user?: string?, score?: number?, lifetime?: number?}} MemObj */
 /** @typedef {{memory: MemObj, dictance: number}} QueriedMemObj */
+/** @typedef {{role: "user" | "assistant" | "system" | string, content: string, name?: string}} OpenLlmMessage */
 
 class Memory {
     /** @type {string} */ id;
     /** @type {string} */ content;
     /** @type {number} */ time;
 
-    /** @type {string? | undefined} */ user;
-    /** @type {number? | undefined} */ score;
-    /** @type {number? | undefined} */ lifetime;
+    /** @type {string?} */ user = null;
+    /** @type {number?} */ score = null;
+    /** @type {number?} */ lifetime = null;
 
     /**
      *
-     * @param {MemObj? | undefined} params
+     * @param {MemObj?} params
      */
     constructor(params = null) {
         if (params) {
             Object.assign(this, params);
         }
-    }
-
-    /**
-     * @param {Record<string,any>} input
-     * @returns {Memory}
-     */
-    static fromRecord(input) {
-        return new Memory(input);
     }
 
     /**
@@ -54,8 +47,8 @@ class Memory {
     toJson() {
         return JSON.stringify(this.toRecord());
     }
-};
-exports.Memory = Memory
+}
+exports.Memory = Memory;
 
 class QueriedMemory {
     /** @type {Memory} */ memory;
@@ -63,20 +56,12 @@ class QueriedMemory {
 
     /**
      *
-     * @param {QueriedMemObj? | undefined} params
+     * @param {QueriedMemObj?} params
      */
     constructor(params = null) {
         if (params) {
             Object.assign(this, params);
         }
-    }
-
-    /**
-     * @param {QueriedMemObj} input
-     * @returns
-     */
-    static fromRecord(input) {
-        return new QueriedMemory(input);
     }
 
     toRecord() {
@@ -89,15 +74,15 @@ class QueriedMemory {
     toJson() {
         return JSON.stringify(this.toRecord());
     }
-};
-exports.QueriedMemory = QueriedMemory
+}
+exports.QueriedMemory = QueriedMemory;
 
 class QueryResult {
-    /** @type {QueriedMemory[]} */ shortTerm
-    /** @type {QueriedMemory[]} */ longTerm
-    /** @type {Memory[]} */        users
+    /** @type {QueriedMemory[]} */ shortTerm;
+    /** @type {QueriedMemory[]} */ longTerm;
+    /** @type {Memory[]} */ users;
 }
-exports.QueryResult = QueryResult
+exports.QueryResult = QueryResult;
 
 class WSWrapper {
     constructor(url, options = {}) {
@@ -190,7 +175,7 @@ class WSWrapper {
     }
 }
 
-exports.Memento = class Memento {
+class Memento {
     /** @private @type {URL} */ _url;
     /** @private @type {WSWrapper?} */ _conn;
     /** @private @type {ChildProcess} */ _proc;
@@ -203,17 +188,17 @@ exports.Memento = class Memento {
      */
     constructor(params = { abs_dir: null, host: "127.0.0.1", port: 4286 }) {
         this._conn = null;
-        this._url = new URL(`wss://${params.host}:${params.port.toString()}`);
+        this._url = new URL(`ws://${params.host}:${params.port.toString()}`);
         this._abs_dir = params.abs_dir;
     }
 
     /**
+     * @private
      * @param {number} port
      * @param {string} host
-     * @param {number} timeoutMs
-     * @returns {Promise}
+     * @returns {Promise<boolean>}
      */
-    isPortOpen(port, host, timeoutMs = 2_000) {
+    checkPortAliveOnce(port, host) {
         return new Promise((resolve) => {
             const socket = new net.Socket();
 
@@ -237,6 +222,36 @@ exports.Memento = class Memento {
         });
     }
 
+    /**
+     * @private
+     * @param {number} port
+     * @param {string} host
+     * @param {number} timeoutMs
+     * @returns {Promise<boolean>}
+     */
+    isPortOpen(port, host, timeoutMs = 2_000) {
+        return new Promise(async (resolve) => {
+            let resolved = false;
+
+            let resolver = (val) => {
+                resolved = true;
+                resolve(val);
+            };
+
+            setTimeout(() => {
+                resolver(false);
+            }, timeoutMs);
+
+            while (!resolved) {
+                let open = await this.checkPortAliveOnce(port, host);
+                if (open) resolver(true);
+            }
+        });
+    }
+
+    /**
+     * @returns {Promise<void>}
+     */
     async connect() {
         let isConnected = await this.isPortOpen(
             this._url.port,
@@ -250,8 +265,13 @@ exports.Memento = class Memento {
                 );
             }
 
-            pyPath = path.join(this._abs_dir, "venv", "Scripts", "python.exe");
-            mainPath = path.join(this._abs_dir, "main.py");
+            let pyPath = path.join(
+                this._abs_dir,
+                "venv",
+                "Scripts",
+                "python.exe"
+            );
+            let mainPath = path.join(this._abs_dir, "main.py");
 
             if (!fs.existsSync(pyPath) || !fs.existsSync(mainPath)) {
                 throw new Error(
@@ -259,9 +279,7 @@ exports.Memento = class Memento {
                 );
             }
 
-            this._proc = spawn(pyPath, [mainPath], {
-                cwd: this._abs_dir,
-            });
+            this._proc = spawn(pyPath, [mainPath], { cwd: this._abs_dir });
             process.once("exit", () => {
                 this._proc.kill(2);
             });
@@ -306,26 +324,28 @@ exports.Memento = class Memento {
 
         switch (msgType) {
             case "query": {
-                let res = new QueryResult()
-                let dbs = obj["from"]
-                
+                let res = new QueryResult();
+                let dbs = obj["from"];
+
                 if ("stm" in dbs)
                     for (let x of obj["stm"])
-                        res.shortTerm.push(QueriedMemory.fromRecord(x))
+                        res.shortTerm.push(new QueriedMemory(x));
 
                 if ("ltm" in dbs)
                     for (let x of obj["ltm"])
-                        res.longTerm.push(QueriedMemory.fromRecord(x))
-                
+                        res.longTerm.push(new QueriedMemory(x));
+
                 if ("users" in dbs)
                     for (let x of obj["users"])
-                        res.users.push(Memory.fromRecord(x))
-                
+                        res.users.push(new Memory(x));
+
                 if (msgId in this._resolvers) {
-                    let resolver = this._resolvers[msgId]
-                    resolver(res)
+                    let resolver = this._resolvers[msgId];
+                    resolver(res);
                 } else {
-                    throw new Error("received unhandled response to query request.")
+                    throw new Error(
+                        "received unhandled response to query request."
+                    );
                 }
             }
         }
@@ -336,40 +356,180 @@ exports.Memento = class Memento {
      * @param params
      * @returns {Promise<QueryResult>}
      */
-    async query(queryStr, params = {
-        collectionName: "default",
-        user: null,
-        from: ["stm", "ltm", "users"],
-        n: [1, 1, 1],
-        timeoutMs: 5_000,
-    }) {
-        let reqId = randomUUID()
+    async query(
+        queryStr,
+        params = {
+            collectionName: "default",
+            user: null,
+            from: ["stm", "ltm", "users"],
+            n: [1, 1, 1],
+            timeoutMs: 5_000,
+        }
+    ) {
+        let reqId = randomUUID();
 
-        let resolver = undefined
+        let resolver;
         let promise = new Promise((resolve) => {
-            resolver = resolve
-        })
+            resolver = resolve;
+        });
 
-        this._resolvers[reqId] = resolver
+        this._resolvers[reqId] = resolver;
 
-        this._conn.send(JSON.stringify({
-            "uid": reqId,
-            "type": "query",
-            "query": queryStr,
-            "ai_name": collectionName,
-            "user": user,
-            "from": from,
-            "n": n,
-        }))
+        this._conn.send(
+            JSON.stringify({
+                uid: reqId,
+                type: "query",
+                query: queryStr,
+                ai_name: params.collectionName,
+                user: params.user,
+                from: params.from,
+                n: params.n,
+            })
+        );
 
-        let timeoutPromise = new Promise((resolve) => setTimeout(resolve, params.timeoutMs))
-        let result = await Promise.race([timeoutPromise, promise])
+        let timeoutPromise = new Promise((resolve) =>
+            setTimeout(resolve, params.timeoutMs)
+        );
+        let result = await Promise.race([timeoutPromise, promise]);
 
-        delete this._resolvers[reqId]
+        delete this._resolvers[reqId];
 
         if (!result) {
-            throw new Error("timeout")
+            throw new Error("timeout");
         }
-        return result
+        return result;
     }
-};
+
+    /**
+     * @param { Memory[] } memories 
+     * @param params 
+     */
+    store(memories, params = {
+        collectionName: "default",
+        to: ["stm", "users"],
+    }) {
+        let memobjs = []
+        for (let mem of memories) {
+            memobjs.push(mem.toRecord())
+        }
+
+        this._conn.send(
+            JSON.stringify({
+                uid: randomUUID(),
+                type: "store",
+                memories: memobjs,
+                ai_name: params.collectionName,
+                to: params.to,
+            })
+        );
+    }
+
+    /**
+     * @param { OpenLlmMessage[] } messages 
+     * @param params
+     */
+    process(messages, params = {
+        /** @type {OpenLlmMessage[]} */
+        context: [],
+        collectionName: "default",
+    }) {
+        this._conn.send(
+            JSON.stringify({
+                uid: randomUUID(),
+                type: "process",
+                messages: messages,
+                context: params.context,
+                ai_name: params.collectionName,
+            })
+        );
+    }
+
+    close() {
+        this._conn.send(
+            JSON.stringify({
+                uid: randomUUID(),
+                type: "close",
+            })
+        );
+    }
+
+    /**
+     * @param {string} collectionName 
+     */
+    evict(collectionName = "default") {
+        this._conn.send(
+            JSON.stringify({
+                uid: randomUUID(),
+                type: "evict",
+                ai_name: collectionName
+            })
+        );
+    }
+
+    clear(params = {
+        collectionName: "default",
+        /** @type {string | null} */
+        user: null,
+        target: "stm",
+    }) {
+        this._conn.send(
+            JSON.stringify({
+                uid: randomUUID(),
+                type: "clear",
+                ai_name: params.collectionName,
+                target: params.target,
+                user: params.user,
+            })
+        );
+    }
+
+    /**
+     * 
+     * @param params 
+     * @returns {Promise<{stm?: number, ltm?: number}>}
+     */
+    async count(params = {
+        collectionName: "default",
+        from: ["stm", "ltm"],
+        timeoutMs: 5_000,
+    }) {
+        let reqId = randomUUID();
+
+        let resolver;
+        let promise = new Promise((resolve) => {
+            resolver = resolve;
+        });
+
+        this._resolvers[reqId] = resolver;
+
+        this._conn.send(
+            JSON.stringify({
+                uid: reqId,
+                type: "count",
+                ai_name: params.collectionName,
+                from: params.from,
+            })
+        );
+
+        let timeoutPromise = new Promise((resolve) =>
+            setTimeout(resolve, params.timeoutMs)
+        );
+        let result = await Promise.race([timeoutPromise, promise]);
+
+        delete this._resolvers[reqId];
+
+        if (result === undefined) {
+            throw new Error("timeout");
+        }
+
+        let ret = {}
+        if ("stm" in result) {
+            ret["stm"] = result["stm"]
+        }
+        if ("ltm" in result) {
+            ret["ltm"] = result["ltm"]
+        }
+        return ret;
+    }
+}
+exports.Memento = Memento;

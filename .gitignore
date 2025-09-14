@@ -6,3 +6,4 @@ users
 "decay_meta/"
 cudnn*
 dump.json
+*/__pycache__

@@ -10,6 +10,7 @@ from src.ai import AI
 from src.config import Config
 from src.memory import Memory
 from src.vdbs.vector_database import VectorDataBase
+from src.retry_and_timeout import with_retry_and_timeout_async
 
 
 class _CompressItem(BaseModel):
@@ -140,14 +141,23 @@ class Compressor:
         by_id = {m.id: m for m in filtered}
         comp_msg = self._build_batch_prompt(ai_name, filtered)
 
-        comp = await self.ai.client.beta.chat.completions.parse(
+        maybe_comp = await with_retry_and_timeout_async(
+            cr=self.ai.client.beta.chat.completions.parse,
             model=self.ai.model_name,
             messages=[comp_msg],
             temperature=self.conf.openllm.temp,
             max_completion_tokens=self.conf.openllm.max_completion_tokens,
             response_format=_CompressOut,
+            timeout=65.0,
+
+            max_retries=5,
+            timeout_each=60.0,
         )
-        out: _CompressOut | None = comp.choices[0].message.parsed
+
+        if maybe_comp is None:
+            raise Exception("failed to compress memories due to ai backend failure. data loss occured.")
+
+        out: _CompressOut | None = maybe_comp.choices[0].message.parsed
         self.log.info("compress_batch_async LLM parsed <<< %s", out.model_dump_json(indent=4))
 
         if out is None or len(out.memories) == 0:
@@ -176,15 +186,23 @@ class Compressor:
 
             merge_msgs = self._build_merge_prompt(ai_name, new_text, existing, self.conf.compression.prefer_new)
 
-            # TODO: better error handling, retry strategy
-
-            merged = (await self.ai.client.beta.chat.completions.parse(
+            maybe_comp = await with_retry_and_timeout_async(
+                cr=self.ai.client.beta.chat.completions.parse,
                 model=self.ai.model_name,
                 messages=merge_msgs,
                 temperature=self.conf.openllm.temp,
                 max_completion_tokens=self.conf.openllm.max_completion_tokens,
                 response_format=_MergeOut,
-            )).choices[0].message.parsed
+                timeout=65.0,
+
+                max_retries=5,
+                timeout_each=60.0,
+            )
+            
+            if maybe_comp is None:
+                raise Exception("failed to process memories due to ai backend failure. data loss occured.")
+            
+            merged = maybe_comp.choices[0].message.parsed
 
             self.log.info("merge LLM parsed <<< %s", merged.model_dump_json(indent=4))
 
