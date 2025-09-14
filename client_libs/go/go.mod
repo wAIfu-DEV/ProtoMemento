@@ -1,4 +1,4 @@
-module github.com/wAIfu-DEV/ProtoMemento
+module github.com/wAIfu-DEV/MementoClientGo
 
 go 1.24.6
 
