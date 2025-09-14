@@ -42,6 +42,13 @@ class CompressionConfig(BaseModel):
     min_batch_on_breach: int = Field(1)            # minimum items to evict when triggered
 
 
+class StmMergeConfig(BaseModel):
+    enabled: bool = Field(True)              
+    similar_top_k: int = Field(5, ge=1)      # how many STM neighbors to compare/merge against
+    prefer_new: bool = Field(True)           # contradictory old memories are deleted
+    temp: float = Field(1.0)                 # (optional) model temp for STM merges
+    max_completion_tokens: int = Field(1000) # (optional) cap for STM merges
+
 class Config(BaseModel):
     wss: WssConfig = Field(WssConfig())
     openllm: OpenLlmConfig = Field(OpenLlmConfig())
@@ -49,6 +56,8 @@ class Config(BaseModel):
     long_vdb: LongVdbConfig = Field(LongVdbConfig())
     user_db: UserDbConfig = Field(UserDbConfig())
     compression: CompressionConfig = Field(CompressionConfig())
+    stm_merge: StmMergeConfig = Field(StmMergeConfig())
+
 
 
 def parse_config()-> Config:
