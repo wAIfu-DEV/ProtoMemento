@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"os"
+	"os/exec"
+	"path"
 	"sync"
 	"time"
 
@@ -137,11 +140,12 @@ type messageHandlers struct {
 }
 
 type Client struct {
-	conn      *websocket.Conn
-	url       url.URL
-	handlers  messageHandlers
-	mutex     sync.Mutex
-	connected bool
+	conn        *websocket.Conn
+	backendProc *os.Process
+	url         url.URL
+	handlers    messageHandlers
+	mutex       sync.Mutex
+	connected   bool
 }
 
 func (c *Client) Disconnect(timeout time.Duration) {
@@ -287,7 +291,7 @@ func (c *Client) recvLoop() {
 	}
 }
 
-func NewClient(host string, port int) (*Client, error) {
+func NewClient(host string, port int, absPath string) (*Client, error) {
 	c := &Client{}
 	c.url = url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", host, port)}
 
@@ -296,11 +300,42 @@ func NewClient(host string, port int) (*Client, error) {
 		count: map[string]chan genericResult[CountResult]{},
 	}
 
+	c.backendProc = nil
 	c.mutex = sync.Mutex{}
 
 	conn, _, err := websocket.DefaultDialer.Dial(c.url.String(), nil)
 	if err != nil {
-		return nil, err
+		if absPath == "" {
+			return nil, err
+		} else {
+			pythonPath := path.Join(absPath, "venv", "Scripts", "python.exe")
+			mainPath := path.Join(absPath, "main.py")
+
+			cmd := exec.Command(pythonPath, mainPath)
+			err = cmd.Start()
+			if err != nil {
+				return nil, err
+			}
+
+			deadline := time.Now().Add(10 * time.Second)
+			var lastErr error = nil
+
+			for time.Now().Before(deadline) {
+				conn, _, err = websocket.DefaultDialer.Dial(c.url.String(), nil)
+				if err == nil {
+					break
+				}
+				lastErr = err
+				time.Sleep(500 * time.Millisecond)
+			}
+
+			if conn == nil {
+				cmd.Process.Kill()
+				return nil, lastErr
+			}
+
+			c.backendProc = cmd.Process
+		}
 	}
 
 	c.conn = conn
