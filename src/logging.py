@@ -1,6 +1,6 @@
 import logging
 
-def logging_init() -> None:
+def logging_init(args) -> None:
     # silence the telemetry error spam
     for name in (
         "chromadb.telemetry",
@@ -15,5 +15,5 @@ def logging_init() -> None:
     logging.basicConfig(
         format="[%(asctime)s][%(name)s.%(funcName)s] %(message)s",
         datefmt="%m/%d %H:%M:%S",
-        level=logging.INFO
+        level=logging.DEBUG if args.verbose else logging.INFO
     )

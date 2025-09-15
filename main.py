@@ -19,7 +19,7 @@ from src.wss_handler import WssHandler
 async def main():
     parsed_args = parse_args(sys.argv[1:])
     
-    logging_init()
+    logging_init(parsed_args)
     logger = logging.getLogger("global")
 
     logger.info("available onnxruntime providers: %s", ", ".join(onnxruntime.get_available_providers()))
