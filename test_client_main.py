@@ -6,7 +6,7 @@ import uuid
 
 from client_libs.python.memento import Memento, DbEnum, Memory, OpenLlmMsg
 
-message_types = ["store", "query", "evict", "process", "close"]
+message_types = ["store", "query", "evict", "process", "count", "clear", "close"]
 msg_type_inp_question = f"\nmsg type ({', '.join(message_types)}): "
 
 
@@ -139,7 +139,7 @@ async def main():
 
                 await client.clear(
                     collection_name=ai_name,
-                    target=target,
+                    target=db_map[target],
                     user=user_val,
                 )
 

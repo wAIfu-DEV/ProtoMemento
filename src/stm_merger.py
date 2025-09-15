@@ -3,6 +3,7 @@ import logging
 from typing import List
 from pydantic import BaseModel, Field
 
+from src.messages import OpenLlmMsg
 from src.ai import AI
 from src.config import Config
 from src.memory import Memory
@@ -55,7 +56,7 @@ class StmMerger:
         ]
 
 
-    async def merge_and_store(self, ai_name: str, new_mem: Memory) -> None:
+    async def merge_and_store(self, ai_name: str, new_mem: Memory, context: List[OpenLlmMsg]) -> None:
         self.log.debug("STM-MERGE start: new_mem=%s", new_mem.content)
 
         # 1) find similar STM neighbors
@@ -78,6 +79,9 @@ class StmMerger:
             existing=existing,
             prefer_new=self.conf.stm_merge.prefer_new
         )
+        if context is not None:
+            ctx_msgs = [x.model_dump() for x in context]
+            merge_msgs = [*ctx_msgs, *merge_msgs]
 
         self.log.debug("STM-MERGE sending merge prompt to model. new_mem.id=%s", new_mem.id)
 

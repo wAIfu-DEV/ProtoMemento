@@ -316,7 +316,11 @@ class WssHandler:
             lifetime=lifetime,
         )
         if self.stm_merger:
-            await self.stm_merger.merge_and_store(message.ai_name, summary_mem)
+            await self.stm_merger.merge_and_store(
+                ai_name=message.ai_name,
+                new_mem=summary_mem,
+                context=message.context if message.context is not None else []
+            )
         else:
             self._dbs.short_term.store(message.ai_name, summary_mem)
 
@@ -340,7 +344,11 @@ class WssHandler:
                 lifetime=lifetime,
             )
             if self.stm_merger:
-                await self.stm_merger.merge_and_store(message.ai_name, mem)
+                await self.stm_merger.merge_and_store(
+                    ai_name=message.ai_name,
+                    new_mem=mem,
+                    context=message.context if message.context is not None else []
+                )
             else:
                 self._dbs.short_term.store(message.ai_name, mem)
             if rem.user is not None:

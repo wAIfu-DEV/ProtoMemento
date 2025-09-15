@@ -81,10 +81,12 @@ class AI:
             "content": f"{ process_prompt }{ msg_str.strip() }",
         }
 
+        ctx_msgs = [x.model_dump() for x in context]
+
         maybe_completion = await with_retry_and_timeout_async(
             cr=self.client.beta.chat.completions.parse,
             model=self.model_name,
-            messages=[*context, prompt_msg],
+            messages=[*ctx_msgs, prompt_msg],
             temperature=self.config.openllm.temp,
             max_completion_tokens=self.config.openllm.max_completion_tokens,
             response_format=ProcessResult,
