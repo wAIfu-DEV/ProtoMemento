@@ -30,5 +30,12 @@
         "prefer_new": true,
         "batch_fraction_on_breach": 0.25,
         "min_batch_on_breach": 1
+    },
+    "stm_merge": {
+        "enabled": true,
+        "similar_top_k": 5,
+        "prefer_new": true,
+        "temp": 1.0,
+        "max_completion_tokens": 1000
     }
 }

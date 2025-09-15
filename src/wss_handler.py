@@ -18,7 +18,7 @@ from src.memory import Memory
 from src.ai import AI
 from src.messages import MessageTypes, MsgClose, MsgEvict, MsgQuery, MsgStore, MsgProcess, MsgCount, MsgClear
 from src.db_bundle import DbBundle
-
+from src.stm_merger import StmMerger
 
 class WssHandler:
     _config: Config
@@ -69,6 +69,8 @@ class WssHandler:
 
         self._compress_q: asyncio.Queue[tuple[str, list[Memory]]] = asyncio.Queue(maxsize=8)
         self._compress_worker_task = asyncio.create_task(self._compressor_worker())
+
+        self.stm_merger = StmMerger(ai=self._ai, vdb=self._dbs.short_term, config=self._config)
 
         self._dbs.short_term.set_on_evict(self._on_evict_chunk)
         self._logger.info("initialized wss handler")
@@ -304,6 +306,21 @@ class WssHandler:
         score = (res.emotional_intensity + res.importance) / 2.0
         lifetime = floor(score * self._config.long_vdb.max_memory_lifetime)
 
+        # store summary to STM
+        summary_mem = Memory(
+            id=str(uuid.uuid4()),
+            content=res.summary,
+            user=None,
+            time=mem_time,
+            score=score,
+            lifetime=lifetime,
+        )
+        if self.stm_merger:
+            await self.stm_merger.merge_and_store(message.ai_name, summary_mem)
+        else:
+            self._dbs.short_term.store(message.ai_name, summary_mem)
+
+
         self._dbs.short_term.store(message.ai_name, Memory(
             id=str(uuid.uuid4()),
             content=res.summary,
@@ -322,7 +339,10 @@ class WssHandler:
                 score=score,
                 lifetime=lifetime,
             )
-            self._dbs.short_term.store(message.ai_name, mem)
+            if self.stm_merger:
+                await self.stm_merger.merge_and_store(message.ai_name, mem)
+            else:
+                self._dbs.short_term.store(message.ai_name, mem)
             if rem.user is not None:
                 self._dbs.users.store(coll_name=message.ai_name, user=rem.user, memory=mem)
         
