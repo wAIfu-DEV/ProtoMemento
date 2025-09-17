@@ -324,16 +324,6 @@ class WssHandler:
         else:
             self._dbs.short_term.store(message.ai_name, summary_mem)
 
-
-        self._dbs.short_term.store(message.ai_name, Memory(
-            id=str(uuid.uuid4()),
-            content=res.summary,
-            user=None,
-            time=mem_time,
-            score=score,
-            lifetime=lifetime,
-        ))
-
         for rem in res.remember:
             mem = Memory(
                 id=str(uuid.uuid4()),
